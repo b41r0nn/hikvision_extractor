@@ -32,15 +32,15 @@ import extractor_hikvision
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # La migración de esquema es CRÍTICA: si falla, la app NO debe arrancar
+    # con la BD desincronizada. Cualquier excepción aquí detiene el lifespan
+    # y el contenedor se reiniciará (docker restart policy).
     print("Aplicando migraciones de Alembic...")
-    try:
-        from alembic import command
-        from alembic.config import Config
-        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
-        command.upgrade(alembic_cfg, "head")
-        print("[MIGRACIONES] Alembic upgrade head aplicado correctamente.")
-    except Exception as e:
-        print(f"[MIGRACIONES ERROR] No se pudieron aplicar migraciones: {e}")
+    from alembic import command
+    from alembic.config import Config
+    alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
+    command.upgrade(alembic_cfg, "head")
+    print("[MIGRACIONES] Alembic upgrade head aplicado correctamente.")
 
     print("Iniciando inicialización de datos...")
     # Cada bloque de inicialización es independiente: un fallo en uno
