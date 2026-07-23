@@ -3,7 +3,7 @@ import extractor_hikvision
 from .database import SessionLocal
 from .sync_empleados import sync_empleados
 from .email_service import enviar_reporte_semanal, enviar_reporte_mensual
-from .config_service import get_periodicidad
+from .config_service import get_periodicidad, set_ultima_extraccion
 
 scheduler = BackgroundScheduler()
 
@@ -13,7 +13,13 @@ def tarea_extraccion_diaria():
     print("[SCHEDULER] Ejecutando extracción diaria programada...")
     try:
         extractor_hikvision.main()
-        print("[SCHEDULER] Extracción diaria completada.")
+        # Solo si la extracción fue exitosa, registramos el timestamp
+        db = SessionLocal()
+        try:
+            set_ultima_extraccion(db)
+        finally:
+            db.close()
+        print("[SCHEDULER] Extracción diaria completada y registrada.")
     except Exception as e:
         print(f"[SCHEDULER ERROR] Extracción diaria: {e}")
 

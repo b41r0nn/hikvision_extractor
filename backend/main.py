@@ -441,8 +441,35 @@ def delete_usuario(
 
 
 @app.get("/api/status")
-def get_status(user: models.Usuario = Depends(require_perm("ver_dashboard"))):
-    return extraction_state
+def get_status(
+    user: models.Usuario = Depends(require_perm("ver_dashboard")),
+    db: Session = Depends(get_db),
+):
+    from .config_service import get_ultima_extraccion
+    from datetime import datetime, timezone, timedelta
+
+    ultima_iso = get_ultima_extraccion(db)
+    alerta_retraso = False
+    horas_desde_ultima = None
+    if ultima_iso:
+        try:
+            ultima = datetime.fromisoformat(ultima_iso)
+            if ultima.tzinfo is None:
+                ultima = ultima.replace(tzinfo=timezone.utc)
+            delta = datetime.now(timezone.utc) - ultima
+            horas_desde_ultima = round(delta.total_seconds() / 3600, 1)
+            # 24h de ciclo + 2h de margen
+            if horas_desde_ultima > 26:
+                alerta_retraso = True
+        except Exception:
+            pass
+
+    return {
+        **extraction_state,
+        "ultima_extraccion_exitosa": ultima_iso,
+        "horas_desde_ultima_extraccion": horas_desde_ultima,
+        "alerta_retraso_extraccion": alerta_retraso,
+    }
 
 @app.post("/api/extraer")
 def forzar_extraccion(

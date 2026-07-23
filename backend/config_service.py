@@ -4,7 +4,8 @@ Gestión persistente de configuración del sistema (destinatarios de correo,
 periodicidad de reportes, etc.) en la base de datos.
 """
 import os
-from typing import List
+from datetime import datetime, timezone
+from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from .models import Configuracion
@@ -18,6 +19,10 @@ DEFAULTS = {
     "reporte_mensual_hora":  os.getenv("REPORTE_MENSUAL_HORA", "7"),
     "reporte_mensual_minuto":os.getenv("REPORTE_MENSUAL_MINUTO", "5"),
 }
+
+# Clave usada para registrar la última ejecución exitosa del job diario
+# de extracción de marcaciones desde el biométrico.
+ULTIMA_EXTRACCION_KEY = "ultima_extraccion_exitosa"
 
 
 def _get(db: Session, clave: str) -> Configuracion | None:
@@ -88,3 +93,17 @@ def set_periodicidad(db: Session, semanal: dict, mensual: dict) -> None:
     set_valor(db, "reporte_mensual_dia",    str(int(mensual["dia"])))
     set_valor(db, "reporte_mensual_hora",   str(int(mensual["hora"])))
     set_valor(db, "reporte_mensual_minuto", str(int(mensual["minuto"])))
+
+
+def set_ultima_extraccion(db: Session, when: Optional[datetime] = None) -> None:
+    """Registra la fecha/hora UTC de la última extracción exitosa."""
+    if when is None:
+        when = datetime.now(timezone.utc)
+    set_valor(db, ULTIMA_EXTRACCION_KEY, when.isoformat())
+
+
+def get_ultima_extraccion(db: Session) -> Optional[str]:
+    """Devuelve el ISO timestamp de la última extracción exitosa, o None."""
+    val = get_valor(db, ULTIMA_EXTRACCION_KEY, "")
+    return val or None
+

@@ -218,6 +218,36 @@ function showTab(name) {
 async function cargarDashboard() {
     const fecha = document.getElementById('kpi-date').value || hoy();
     await Promise.all([cargarKPIs(fecha), cargarTardanzas(fecha), cargarMarcas()]);
+    await mostrarAvisoExtraccion();
+}
+
+async function mostrarAvisoExtraccion() {
+    const banner = document.getElementById('extraccion-alerta');
+    if (!banner) return;
+    try {
+        const res = await apiFetch(`${API}/status`);
+        if (!res.ok) return;
+        const s = await res.json();
+        banner.classList.add('hidden');
+        if (s.alerta_retraso_extraccion) {
+            const horas = s.horas_desde_ultima_extraccion;
+            const ultima = s.ultima_extraccion_exitosa || '—';
+            banner.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.071 19h13.858c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <div class="flex-1">
+                        <div class="font-semibold text-red-300">Extracción automática atrasada</div>
+                        <div class="text-xs text-red-200/80 mt-0.5">
+                            La última extracción exitosa fue hace <strong>${horas}h</strong>
+                            (${ultima}). El ciclo es cada 24h. Revisa el scheduler o reinicia el backend.
+                        </div>
+                    </div>
+                </div>`;
+            banner.classList.remove('hidden');
+        }
+    } catch (e) {
+        // silencioso
+    }
 }
 
 async function cargarKPIs(fecha) {
