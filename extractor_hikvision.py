@@ -89,7 +89,7 @@ def fetch_range(start_iso, end_iso):
             events.extend(batch)
             if len(events) >= total:
                 break
-            position += BATCH_SIZE
+            position += len(batch)
 
     return events, total_reported
 
