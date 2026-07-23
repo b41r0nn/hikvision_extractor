@@ -5,6 +5,8 @@ Adaptado para la Fase 2: Guarda los registros en la base de datos PostgreSQL/SQL
 """
 
 import os
+import uuid
+import threading
 import requests
 import argparse
 from datetime import date, timedelta, datetime
@@ -27,6 +29,12 @@ URL    = f"http://{IP}/ISAPI/AccessControl/AcsEvent?format=json"
 
 BATCH_SIZE = 50
 
+# Lock global para serializar TODAS las llamadas al biométrico.
+# El hardware soporta 1-2 conexiones concurrentes como mucho; cualquier
+# llamada paralela (job programado + manual + script de diagnóstico)
+# puede corromper la paginación y hacer perder eventos.
+_device_lock = threading.Lock()
+
 EVENT_MAP = {
     (5, 38):   "Fingerprint Recognition Passed",
     (5, 75):   "Face Authentication Passed",
@@ -46,37 +54,42 @@ AUTH_MINORS = {38, 75, 104}
 # ── API ───────────────────────────────────────────────────────────────────────
 def fetch_range(start_iso, end_iso):
     events, position, total_reported = [], 0, 0
-    while True:
-        payload = {"AcsEventCond": {
-            "searchID": "1", "searchResultPosition": position,
-            "maxResults": BATCH_SIZE, "major": 5, "minor": 0,
-            "startTime": start_iso, "endTime": end_iso,
-        }}
-        try:
-            r = requests.post(URL, json=payload,
-                              auth=HTTPDigestAuth(USER, PASS), timeout=15)
-            r.raise_for_status()
-            data = r.json()
-        except requests.exceptions.ConnectionError:
-            print(f"  [ERROR] Sin conexion a {IP}")
-            break
-        except requests.exceptions.HTTPError as e:
-            print(f"  [ERROR] HTTP {e.response.status_code}")
-            break
-        except Exception as e:
-            print(f"  [ERROR] {e}")
-            break
+    # searchID único por sesión de búsqueda: reutilizar el mismo ID entre
+    # llamadas (incluso entre paginaciones) hace que el dispositivo
+    # pise resultados y se pierdan eventos. UUID v4 por llamada.
+    search_id = str(uuid.uuid4())
+    with _device_lock:
+        while True:
+            payload = {"AcsEventCond": {
+                "searchID": search_id, "searchResultPosition": position,
+                "maxResults": BATCH_SIZE, "major": 5, "minor": 0,
+                "startTime": start_iso, "endTime": end_iso,
+            }}
+            try:
+                r = requests.post(URL, json=payload,
+                                  auth=HTTPDigestAuth(USER, PASS), timeout=15)
+                r.raise_for_status()
+                data = r.json()
+            except requests.exceptions.ConnectionError:
+                print(f"  [ERROR] Sin conexion a {IP}")
+                break
+            except requests.exceptions.HTTPError as e:
+                print(f"  [ERROR] HTTP {e.response.status_code}")
+                break
+            except Exception as e:
+                print(f"  [ERROR] {e}")
+                break
 
-        batch = data.get("AcsEvent", {}).get("InfoList", [])
-        total = data.get("AcsEvent", {}).get("totalMatches", 0)
-        if position == 0:
-            total_reported = total
-        if not batch:
-            break
-        events.extend(batch)
-        if len(events) >= total:
-            break
-        position += BATCH_SIZE
+            batch = data.get("AcsEvent", {}).get("InfoList", [])
+            total = data.get("AcsEvent", {}).get("totalMatches", 0)
+            if position == 0:
+                total_reported = total
+            if not batch:
+                break
+            events.extend(batch)
+            if len(events) >= total:
+                break
+            position += BATCH_SIZE
 
     return events, total_reported
 
