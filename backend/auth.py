@@ -103,14 +103,17 @@ def init_rbac(db: Session) -> None:
         permiso_objs[nombre] = p
     db.commit()
 
-    # Rol Admin con todos los permisos
+    # Rol Admin con TODOS los permisos existentes en la BD
+    # (se asignan desde la BD para que el Admin siempre tenga acceso completo,
+    #  aunque el dict PERMISOS del código no los conozca aún)
     admin_rol = db.query(models.Rol).filter(models.Rol.nombre == "Admin").first()
     if not admin_rol:
         admin_rol = models.Rol(nombre="Admin")
         db.add(admin_rol)
         db.commit()
         db.refresh(admin_rol)
-    admin_rol.permisos = list(permiso_objs.values())
+    todos_los_permisos = db.query(models.Permiso).all()
+    admin_rol.permisos = todos_los_permisos
 
     # Rol Reportes (dashboard + reportes)
     reportes_rol = db.query(models.Rol).filter(models.Rol.nombre == "Reportes").first()
