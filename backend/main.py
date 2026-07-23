@@ -32,8 +32,15 @@ import extractor_hikvision
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("Creando tablas en la base de datos si no existen...")
-    models.Base.metadata.create_all(bind=engine)
+    print("Aplicando migraciones de Alembic...")
+    try:
+        from alembic import command
+        from alembic.config import Config
+        alembic_cfg = Config(os.path.join(os.path.dirname(__file__), "..", "alembic.ini"))
+        command.upgrade(alembic_cfg, "head")
+        print("[MIGRACIONES] Alembic upgrade head aplicado correctamente.")
+    except Exception as e:
+        print(f"[MIGRACIONES ERROR] No se pudieron aplicar migraciones: {e}")
 
     print("Iniciando inicialización de datos...")
     # Cada bloque de inicialización es independiente: un fallo en uno
@@ -45,6 +52,7 @@ async def lifespan(app: FastAPI):
             n = init_festivos(db)
             print(f"[FESTIVOS] {n} festivos poblados desde la librería holidays.")
         except Exception as e:
+            db.rollback()
             print(f"[FESTIVOS ERROR] No se pudieron poblar festivos: {e}")
 
         # 2. Roles, permisos y usuario admin
@@ -52,6 +60,7 @@ async def lifespan(app: FastAPI):
             init_rbac(db)
             print("[RBAC] Roles y permisos inicializados.")
         except Exception as e:
+            db.rollback()
             print(f"[RBAC ERROR] No se pudieron inicializar roles/permisos: {e}")
 
         # 3. Configuración por defecto (correo y periodicidad)
@@ -59,6 +68,7 @@ async def lifespan(app: FastAPI):
             config_service.init_defaults(db)
             print("[CONFIG] Configuración por defecto inicializada.")
         except Exception as e:
+            db.rollback()
             print(f"[CONFIG ERROR] No se pudo inicializar configuración: {e}")
     finally:
         db.close()
