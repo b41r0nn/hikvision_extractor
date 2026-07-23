@@ -35,24 +35,35 @@ async def lifespan(app: FastAPI):
     print("Creando tablas en la base de datos si no existen...")
     models.Base.metadata.create_all(bind=engine)
 
-    print("Iniciando scheduler de tareas en segundo plano...")
-    # Poblar festivos colombianos automáticamente (año anterior, actual y siguiente)
+    print("Iniciando inicialización de datos...")
+    # Cada bloque de inicialización es independiente: un fallo en uno
+    # NO debe abortar los demás.
     db = next(get_db())
     try:
-        n = init_festivos(db)
-        print(f"[FESTIVOS] {n} festivos poblados desde la librería holidays.")
+        # 1. Festivos colombianos
+        try:
+            n = init_festivos(db)
+            print(f"[FESTIVOS] {n} festivos poblados desde la librería holidays.")
+        except Exception as e:
+            print(f"[FESTIVOS ERROR] No se pudieron poblar festivos: {e}")
 
-        # Crear roles, permisos y usuario admin por defecto
-        init_rbac(db)
-        print("[RBAC] Roles y permisos inicializados.")
+        # 2. Roles, permisos y usuario admin
+        try:
+            init_rbac(db)
+            print("[RBAC] Roles y permisos inicializados.")
+        except Exception as e:
+            print(f"[RBAC ERROR] No se pudieron inicializar roles/permisos: {e}")
 
-        # Configuración por defecto (destinatarios y periodicidad)
-        config_service.init_defaults(db)
-        print("[CONFIG] Configuración por defecto inicializada.")
-    except Exception as e:
-        print(f"[INIT ERROR] No se pudieron poblar datos iniciales: {e}")
+        # 3. Configuración por defecto (correo y periodicidad)
+        try:
+            config_service.init_defaults(db)
+            print("[CONFIG] Configuración por defecto inicializada.")
+        except Exception as e:
+            print(f"[CONFIG ERROR] No se pudo inicializar configuración: {e}")
     finally:
         db.close()
+
+    print("Iniciando scheduler de tareas en segundo plano...")
     start_scheduler()
     yield
     print("Apagando API...")
