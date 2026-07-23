@@ -4,7 +4,8 @@ Gestión persistente de configuración del sistema (destinatarios de correo,
 periodicidad de reportes, etc.) en la base de datos.
 """
 import os
-from datetime import datetime, timezone
+import json
+from datetime import datetime, timezone, date
 from typing import List, Optional
 from sqlalchemy.orm import Session
 
@@ -106,4 +107,60 @@ def get_ultima_extraccion(db: Session) -> Optional[str]:
     """Devuelve el ISO timestamp de la última extracción exitosa, o None."""
     val = get_valor(db, ULTIMA_EXTRACCION_KEY, "")
     return val or None
+
+
+# ── Alertas de extracción incompleta ───────────────────────────────────────
+# Cuando el dispositivo reporta un totalMatches para el día pero la
+# extracción (incluso con el fallback AM/PM/Q1-Q4) devuelve menos eventos,
+# se persiste aquí. Mantenemos solo los últimos N días para no crecer
+# indefinidamente.
+ALERTAS_EXTRACCION_KEY = "extraccion_incompleta_dias"
+ALERTAS_MAX_RECIENTES = 14  # mantener 2 semanas de historial
+
+
+def get_alertas_extraccion(db: Session) -> List[dict]:
+    """Devuelve la lista de alertas de extracción incompleta recientes."""
+    raw = get_valor(db, ALERTAS_EXTRACCION_KEY, "[]")
+    try:
+        return json.loads(raw)
+    except Exception:
+        return []
+
+
+def add_alerta_extraccion(db: Session, fecha: date, esperado: int, obtenido: int) -> None:
+    """Registra una alerta de extracción incompleta para una fecha.
+    Si ya existe una alerta para esa fecha, actualiza los valores si los
+    nuevos son peores (más faltantes). Mantiene solo los últimos N días."""
+    alertas = get_alertas_extraccion(db)
+    fecha_str = fecha.isoformat()
+    # Buscar existente
+    found = False
+    for a in alertas:
+        if a.get("fecha") == fecha_str:
+            # Actualizar solo si el gap es mayor
+            gap_viejo = a["esperado"] - a["obtenido"]
+            gap_nuevo = esperado - obtenido
+            if gap_nuevo > gap_viejo:
+                a["esperado"] = esperado
+                a["obtenido"] = obtenido
+                a["registrado_en"] = datetime.now(timezone.utc).isoformat()
+            found = True
+            break
+    if not found:
+        alertas.append({
+            "fecha": fecha_str,
+            "esperado": esperado,
+            "obtenido": obtenido,
+            "registrado_en": datetime.now(timezone.utc).isoformat(),
+        })
+    # Ordenar por fecha descendente y mantener solo los N más recientes
+    alertas.sort(key=lambda x: x["fecha"], reverse=True)
+    alertas = alertas[:ALERTAS_MAX_RECIENTES]
+    set_valor(db, ALERTAS_EXTRACCION_KEY, json.dumps(alertas))
+
+
+def clear_alerta_extraccion(db: Session, fecha: date) -> None:
+    """Elimina la alerta de una fecha (útil cuando la re-extracción la resolvió)."""
+    alertas = [a for a in get_alertas_extraccion(db) if a.get("fecha") != fecha.isoformat()]
+    set_valor(db, ALERTAS_EXTRACCION_KEY, json.dumps(alertas))
 

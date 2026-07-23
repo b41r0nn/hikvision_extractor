@@ -20,6 +20,7 @@ load_dotenv()
 from backend.database import SessionLocal
 from backend.models import RegistroAsistencia
 from backend.timezone import hoy_bogota
+from backend import config_service
 
 # ── Configuración ─────────────────────────────────────────────────────────────
 IP     = os.getenv("DEVICE_IP", "192.168.1.127")
@@ -109,7 +110,7 @@ def fetch_day(day):
 
     full, total = fetch_range(f"{ds}T00:00:00", f"{ds}T23:59:59")
     if len(full) >= total:
-        return full
+        return full, total
 
     print(f"  [!] {day}: total={total} obtenidos={len(full)} -> dividiendo AM/PM")
     am, am_t = fetch_range(f"{ds}T00:00:00", f"{ds}T11:59:59")
@@ -132,7 +133,7 @@ def fetch_day(day):
     else:
         combined.extend(pm)
 
-    return dedup(combined)
+    return dedup(combined), total
 
 
 def normalize(e):
@@ -240,16 +241,29 @@ def main(start_str=None, end_str=None, progress_callback=None):
             if progress_callback:
                 progress_callback(msg_day)
                 
-            raw   = fetch_day(current)
+            raw, total_esperado = fetch_day(current)
             evts  = parse_events(raw, current)
             guardados = save_to_db(db, evts, include_all=args.all)
-            
+
             total_eventos += guardados
             msg_res = f"  -> {guardados} nuevos registros guardados."
             print(msg_res)
             if progress_callback:
                 progress_callback(msg_day + msg_res)
-                
+
+            # Auto-verificación: si el total reportado por el dispositivo
+            # es mayor que lo que pudimos descargar (incluso con fallback),
+            # persistir una alerta para que el dashboard la muestre.
+            if len(raw) < total_esperado:
+                config_service.add_alerta_extraccion(
+                    db, current, total_esperado, len(raw)
+                )
+                print(f"  [ALERTA] {current}: esperado={total_esperado}, "
+                      f"obtenido={len(raw)} -> alerta guardada")
+            else:
+                # Si había una alerta previa y ahora se completó, limpiarla
+                config_service.clear_alerta_extraccion(db, current)
+
             current += timedelta(days=1)
             
         db.commit()

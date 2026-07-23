@@ -223,11 +223,14 @@ async function cargarDashboard() {
 
 async function mostrarAvisoExtraccion() {
     const banner = document.getElementById('extraccion-alerta');
-    if (!banner) return;
+    const bannerInc = document.getElementById('extraccion-incompleta-alerta');
+    if (!banner || !bannerInc) return;
     try {
         const res = await apiFetch(`${API}/status`);
         if (!res.ok) return;
         const s = await res.json();
+
+        // Banner 1: extracción atrasada (>26h)
         banner.classList.add('hidden');
         if (s.alerta_retraso_extraccion) {
             const horas = s.horas_desde_ultima_extraccion;
@@ -244,6 +247,29 @@ async function mostrarAvisoExtraccion() {
                     </div>
                 </div>`;
             banner.classList.remove('hidden');
+        }
+
+        // Banner 2: extracción incompleta (totalMatches > obtenidos)
+        bannerInc.classList.add('hidden');
+        if (s.alerta_extraccion_incompleta && Array.isArray(s.extraccion_incompleta) && s.extraccion_incompleta.length > 0) {
+            const lines = s.extraccion_incompleta.map(a => {
+                const f = a.fecha || '—';
+                const ob = a.obtenido ?? 0;
+                const es = a.esperado ?? 0;
+                return `<div>Extracción del <strong>${f}</strong> puede estar incompleta (<strong>${ob}</strong> de <strong>${es}</strong> eventos)</div>`;
+            }).join('');
+            bannerInc.innerHTML = `
+                <div class="flex items-start gap-3">
+                    <svg class="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M5.071 19h13.858c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <div class="flex-1">
+                        <div class="font-semibold text-red-300">Extracción incompleta</div>
+                        <div class="text-xs text-red-200/80 mt-0.5 space-y-0.5">
+                            ${lines}
+                            <div class="mt-1 opacity-75">Re-corre la extracción para esa fecha o revisa los logs del backend.</div>
+                        </div>
+                    </div>
+                </div>`;
+            bannerInc.classList.remove('hidden');
         }
     } catch (e) {
         // silencioso

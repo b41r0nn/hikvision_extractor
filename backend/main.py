@@ -445,7 +445,7 @@ def get_status(
     user: models.Usuario = Depends(require_perm("ver_dashboard")),
     db: Session = Depends(get_db),
 ):
-    from .config_service import get_ultima_extraccion
+    from .config_service import get_ultima_extraccion, get_alertas_extraccion
     from datetime import datetime, timezone, timedelta
 
     ultima_iso = get_ultima_extraccion(db)
@@ -464,11 +464,15 @@ def get_status(
         except Exception:
             pass
 
+    alertas_incompletas = get_alertas_extraccion(db)
+
     return {
         **extraction_state,
         "ultima_extraccion_exitosa": ultima_iso,
         "horas_desde_ultima_extraccion": horas_desde_ultima,
         "alerta_retraso_extraccion": alerta_retraso,
+        "extraccion_incompleta": alertas_incompletas,
+        "alerta_extraccion_incompleta": len(alertas_incompletas) > 0,
     }
 
 @app.post("/api/extraer")
