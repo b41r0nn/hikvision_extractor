@@ -1,0 +1,103 @@
+from apscheduler.schedulers.background import BackgroundScheduler
+import extractor_hikvision
+from .database import SessionLocal
+from .sync_empleados import sync_empleados
+from .email_service import enviar_reporte_semanal, enviar_reporte_mensual
+from .config_service import get_periodicidad
+
+scheduler = BackgroundScheduler()
+
+
+def tarea_extraccion_diaria():
+    """Extrae eventos del día actual a las 8:00 PM."""
+    print("[SCHEDULER] Ejecutando extracción diaria programada...")
+    try:
+        extractor_hikvision.main()
+        print("[SCHEDULER] Extracción diaria completada.")
+    except Exception as e:
+        print(f"[SCHEDULER ERROR] Extracción diaria: {e}")
+
+
+def tarea_sync_empleados_diaria():
+    """Sincroniza empleados enrolados en el biométrico a las 7:00 AM."""
+    print("[SCHEDULER] Sincronizando empleados desde el biométrico...")
+    db = SessionLocal()
+    try:
+        result = sync_empleados(db)
+        print(f"[SCHEDULER] Empleados sincronizados: {result}")
+    except Exception as e:
+        print(f"[SCHEDULER ERROR] Sincronización empleados: {e}")
+    finally:
+        db.close()
+
+
+def tarea_reporte_semanal():
+    """Genera y envía el reporte semanal según la configuración."""
+    print("[SCHEDULER] Generando y enviando reporte semanal...")
+    enviar_reporte_semanal()
+
+
+def tarea_reporte_mensual():
+    """Genera y envía el reporte mensual según la configuración."""
+    print("[SCHEDULER] Generando y enviando reporte mensual...")
+    enviar_reporte_mensual()
+
+
+def schedule_reporte_semanal():
+    """Lee la periodicidad de la BD y programa el job semanal."""
+    db = SessionLocal()
+    try:
+        cfg = get_periodicidad(db)["semanal"]
+    finally:
+        db.close()
+
+    scheduler.add_job(
+        tarea_reporte_semanal,
+        "cron",
+        day_of_week=str(cfg["dia"]),
+        hour=cfg["hora"],
+        minute=cfg["minuto"],
+        id="reporte_semanal",
+        replace_existing=True,
+    )
+
+
+def schedule_reporte_mensual():
+    """Lee la periodicidad de la BD y programa el job mensual."""
+    db = SessionLocal()
+    try:
+        cfg = get_periodicidad(db)["mensual"]
+    finally:
+        db.close()
+
+    scheduler.add_job(
+        tarea_reporte_mensual,
+        "cron",
+        day=cfg["dia"],
+        hour=cfg["hora"],
+        minute=cfg["minuto"],
+        id="reporte_mensual",
+        replace_existing=True,
+    )
+
+
+def reschedule_report_jobs():
+    """Reprograma en caliente los jobs de reportes semanal/mensual."""
+    schedule_reporte_semanal()
+    schedule_reporte_mensual()
+    print("[SCHEDULER] Jobs de reportes reprogramados.")
+
+
+def start_scheduler():
+    # Sincronización de empleados a las 7:00 AM (antes del reporte semanal)
+    scheduler.add_job(tarea_sync_empleados_diaria, "cron", hour=7, minute=0,
+                      id="sync_empleados_diaria", replace_existing=True)
+    # Extracción diaria a las 8:00 PM (L-D para no perder ningún día)
+    scheduler.add_job(tarea_extraccion_diaria, "cron", hour=20, minute=0,
+                      id="extraccion_diaria", replace_existing=True)
+    # Reportes: leen periodicidad de la BD
+    schedule_reporte_semanal()
+    schedule_reporte_mensual()
+    if not scheduler.running:
+        scheduler.start()
+    print("[SCHEDULER] Scheduler iniciado. Jobs: sync_empleados_diaria, extraccion_diaria, reporte_semanal, reporte_mensual.")

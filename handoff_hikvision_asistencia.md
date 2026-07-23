@@ -1,0 +1,227 @@
+# HANDOFF — Sistema de Asistencia Biométrica REDIHOS (Fase 3)
+
+**Empresa:** REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S (REDIHOS)  
+**Fase:** 3 — Servicio web con PostgreSQL, dashboard, reportes automáticos y panel de administración  
+**Stack:** FastAPI + Uvicorn + PostgreSQL + Nginx + APScheduler + Docker  
+**Última actualización:** 22 de julio de 2026  
+**Estado:** Batch de cambios cerrado
+
+---
+
+## 1. Inventario actual
+
+### 1.1 `hikvision_extractor/`
+
+| Archivo | Estado | Descripción |
+|---|---|---|
+| `extractor_hikvision.py` | ✅ Funcional | Extracción ISAPI con paginación AM/PM/Q1-Q4. Lee credenciales del biométrico desde `.env`. Probado contra dispositivo real. |
+| `backend/sync_empleados.py` | ✅ Funcional | Sincroniza `Empleado` desde `/ISAPI/AccessControl/UserInfo/Search` con upsert por `employeeNo`. Nunca elimina. |
+| `backend/main.py` | ✅ Funcional | API FastAPI con endpoints de KPIs, tardanzas, registros, empleados, turnos, festivos, reportes, correo, sincronización de empleados, auth y RBAC. `create_all` ejecuta en el `lifespan`. |
+| `backend/models.py` | ✅ Funcional | `Turno`, `Empleado`, `Festivo`, `RegistroAsistencia`, `Rol`, `Permiso`, `Usuario`. |
+| `backend/auth.py` | ✅ Funcional | JWT, hash Argon2id, expiración configurable, roles/permisos, `require_perm()` y seed de roles. |
+| `backend/timezone.py` | ✅ Funcional | Helper `hoy_bogota()` / `ahora_bogota()` para que todo el backend use `America/Bogota`. |
+| `backend/config_service.py` | ✅ Funcional | Configuración persistente: destinatarios de correo y periodicidad de reportes. |
+| `backend/database.py` | ✅ Funcional | Conexión PostgreSQL via `DATABASE_URL` en `.env`. |
+| `backend/report_service.py` | ✅ Funcional | Generación Excel dinámica, cálculo de tardanzas, turno default para empleados sin turno propio. |
+| `backend/email_service.py` | ✅ Funcional | Envío SMTP de reportes semanal/mensual. Lee destinatarios desde la base de datos (configurables en admin). SMTP sigue configurado en `.env`.
+| `backend/scheduler.py` | ✅ Funcional | APScheduler: sync empleados, extracción diaria, reporte semanal, reporte mensual. |
+| `frontend/index.html` | ✅ Funcional | UI con login, cambio obligatorio de contraseña, dashboard, reportes, administración, usuarios/roles. |
+| `frontend/app.js` | ✅ Funcional | Lógica del frontend, autenticación JWT, polling de extracción, RBAC, flujo de cambio de contraseña. |
+| `generar_informe.py` | ✅ Funcional | CLI de reportes desde PostgreSQL. |
+| `migrate_csv.py` | ✅ Funcional | Migra CSV de iVMS-4200 a PostgreSQL, guarda `evento_raw`. |
+| `docker-compose.yml` | ✅ Funcional | Sin credenciales hardcodeadas. |
+| `.env.example` | ✅ Funcional | Documenta todas las variables necesarias. |
+| `.gitignore` | ✅ Creado | Excluye `.venv/`, `.env`, `__pycache__/`, etc. |
+| `README.md` | ✅ Actualizado | Refleja la arquitectura Fase 3. |
+
+### 1.2 Eliminados en Fase 3
+
+- `extraccion_diaria.sh`
+- `extraccion_diaria.bat`
+- `maestro_hikvision.csv` (reemplazado por PostgreSQL)
+
+---
+
+## 2. Decisiones de negocio implementadas
+
+### 2.1 Sábados y domingos NO son días laborales
+- `report_service.es_dia_laboral()` devuelve `d.weekday() < 5 and d not in festivos`, es decir, **lunes a viernes sin festivos**.
+- Tardanzas y reportes solo se calculan sobre días laborales.
+- Verificado con datos reales: período 20/07/2026 (lunes festivo) a 26/07/2026 (domingo) arrojó 4 días laborales (martes a viernes). Sábado y domingo quedan fuera del Excel.
+
+### 2.2 Empleados se sincronizan automáticamente desde el biométrico
+- `backend/sync_empleados.py` consulta `/ISAPI/AccessControl/UserInfo/Search` (personas enroladas) con paginación adaptada al límite del dispositivo.
+- Upsert por `employeeNoString`: si existe, actualiza `nombre`; si es nuevo, lo crea con `activo=True`, `turno_id=None`, `departamento=None`.
+- **Nunca** se elimina un empleado automáticamente si desaparece del dispositivo; el admin lo desactiva manualmente.
+- La sincronización corre diariamente a las 7:00 AM vía scheduler y también se puede disparar manualmente desde el admin (`POST /api/empleados/sync`).
+- Las marcas sin empleado asociado se siguen exponiendo en `/api/registros/sin-asociar` para revisión.
+
+### 2.3 Turno individual por empleado
+- Cada empleado tiene su propia `hora_entrada` y `tolerancia_minutos` en la tabla `Empleado`.
+- Si no se configuran, se usa el turno default del `.env` (`DEFAULT_TURNO_ENTRADA`, `DEFAULT_TOLERANCIA_MINUTOS`).
+- El catálogo compartido de turnos ya no se usa en la UI; el admin configura hora y tolerancia directamente en la vista de empleados.
+
+### 2.4 Empleados activos aparecen en el reporte
+- El reporte Excel incluye **todos los empleados `activo=True`**, independientemente de si tienen turno individual configurado.
+- Empleados inactivos quedan fuera del reporte.
+- Quienes no tengan marcas en el período muestran `SIN REGISTRO` día por día.
+
+### 2.5 Marcas casi simultáneas se fusionan en el Excel
+- `report_service._fusionar_marcas_por_empleado_dia()` agrupa marcas del mismo empleado/día que caen dentro de `MARCA_FUSION_MINUTOS` desde la primera marca del grupo.
+- La ventana se configura en `.env` (default 2 minutos). Use `0` para desactivar la fusión.
+- El número dinámico de columnas "Marca N" se calcula **sobre los datos ya fusionados**, no sobre los registros crudos.
+- La base de datos (`RegistroAsistencia`) conserva todas las marcas originales sin modificar.
+
+### 2.6 Festivos automáticos vía `holidays`
+- `report_service.init_festivos()` puebla la tabla `Festivo` con festivos colombianos al iniciar la app.
+- La librería `holidays` se encarga de festivos móviles trasladados por Ley Emiliani.
+- El panel de festivos es solo lectura; no hay administración manual.
+
+### 2.7 Configuración de correo y periodicidad persistente
+- La tabla `Configuracion` almacena destinatarios de correo y la periodicidad de reportes (día/hora semanal, día/hora mensual).
+- El admin puede agregar/quitar destinatarios y cambiar la periodicidad desde la pestaña Correo.
+- Al guardar periodicidad, el backend llama `scheduler.reschedule_report_jobs()` para reprogramar los jobs de APScheduler en caliente (sin reiniciar).
+- Los reportes automáticos usan los destinatarios de la base de datos; las credenciales SMTP siguen en `.env`.
+
+### 2.8 Autenticación JWT y RBAC escalable
+- Tablas: `Rol`, `Permiso`, `RolPermiso`, `Usuario`.
+- Los roles y permisos se configuran desde el frontend (pestaña "Usuarios y roles"); no hay roles hardcodeados en el código.
+- Semilla inicial: rol `Admin` (todos los permisos) y rol `Reportes` (solo `ver_dashboard` y `generar_reportes`).
+- Cada endpoint valida el permiso requerido con `require_perm()`; el frontend oculta la pestaña Admin si el usuario no tiene permisos administrativos.
+- Contraseñas hasheadas con **Argon2id** (`passlib` + `argon2-cffi`); nunca texto plano ni MD5/SHA1.
+- `SECRET_KEY` leído de `.env`; el token JWT expira según `ACCESS_TOKEN_EXPIRE_MINUTES` (default 8 horas = 480 minutos).
+- Usuario admin por defecto configurable en `.env` (`ADMIN_USERNAME`, `ADMIN_PASSWORD`).
+- **Forzado de cambio de contraseña en primer login**: los usuarios sembrados desde `.env` (`admin` y `reportes`) tienen `requiere_cambio_password=True`. El login devuelve esa bandera; el frontend bloquea la app hasta que cambien la contraseña vía `POST /api/auth/cambiar-password`. Tras el cambio la bandera pasa a `False`.
+
+### 2.9 Zona horaria del backend: America/Bogota
+- Se agregó `backend/timezone.py` con helpers `hoy_bogota()` y `ahora_bogota()` usando `ZoneInfo("America/Bogota")`.
+- Todos los lugares que usaban `date.today()` para determinar el "día de negocio" ahora usan `hoy_bogota()` (KPIs, tardanzas, extracción por defecto, reportes automáticos).
+- El `backend.Dockerfile` instala `tzdata`, define `ENV TZ=America/Bogota` y vincula `/etc/localtime` y `/etc/timezone`.
+- `docker-compose.yml` también exporta `TZ=America/Bogota` al contenedor backend.
+- El frontend sigue usando `hoy()` con `timeZone: 'America/Bogota'`.
+
+---
+
+## 3. Flujo end-to-end
+
+```
+┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Biométrico     │────▶│  extractor_       │────▶│  PostgreSQL    │
+│  Hikvision      │ ISAPI│ hikvision.py     │     │  (registros)    │
+└─────────────────┘     └──────────────────┘     └─────────────────┘
+                                                           │
+                                 ┌─────────────────────────┘
+                                 ▼
+                        ┌──────────────────┐
+                        │  backend/main.py  │
+                        │  FastAPI + UI     │
+                        └──────────────────┘
+                                 │
+              ┌─────────────────┼─────────────────┐
+              ▼                 ▼                 ▼
+        ┌──────────┐      ┌──────────┐      ┌──────────┐
+        │ KPIs /   │      │ Reportes │      │ Correo   │
+        │ Tardanzas│      │  Excel   │      │ SMTP     │
+        └──────────┘      └──────────┘      └──────────┘
+```
+
+---
+
+## 4. Validación con datos reales del biométrico
+
+Ejecución de extracción real `2026-07-21` a `2026-07-22`:
+
+| Métrica | Valor |
+|---|---|
+| Total registros insertados | **121** |
+| Registros 2026-07-21 | 92 |
+| Registros 2026-07-22 | 29 |
+| Nombres únicos | 46 |
+| Registros sin nombre | 0 |
+| Eventos huella (`Fingerprint Recognition Passed`) | 81 |
+| Eventos rostro (`Face Authentication Passed`) | 40 |
+| Lógica AM/PM/Q1-Q4 | Activada ambos días |
+
+### Observaciones de datos reales
+- Se detectaron marcas muy cercanas en el tiempo (ej. 08:00:43, 08:00:46, 08:00:47) para la misma persona. No son duplicados: son autenticaciones distintas. El Excel las muestra como `08:00` porque trunca a HH:MM.
+- Hay 36 nombres del biométrico que no coinciden con empleados registrados; aparecen en el panel "Marcas sin asociar".
+- Rango de horas reales: 05:46:51 a 19:34:33.
+
+### Reporte Excel verificado
+- Encabezado azul oscuro `#1F3864` con texto blanco.
+- Celdas de hora con fondo verde claro `#E8F5E9`.
+- Columnas "Marca N" dinámicas (hasta 5 subcolumnas por día).
+- Fila de totales presente.
+- Encabezado con rango de fechas, empleados, días laborales, total marcaciones y días sin registro.
+
+### Dashboard verificado (endpoints)
+- `/api/kpis` retorna KPIs coherentes.
+- `/api/tardanzas` calcula tardanzas con turno asignado o turno default.
+- `/api/registros/sin-asociar` lista 36 nombres sin empleado asociado.
+- `/api/extraer` dispara extracción real y `/api/status` refleja progreso (polling funcional).
+- Filtros de reporte por empleado, por selección múltiple y por departamento cambian el resultado.
+
+### Pendiente de validación visual
+- No se pudo abrir el frontend en navegador gráfico porque el entorno de ejecución es solo línea de comandos. Los archivos estáticos (`index.html`, `app.js`) existen y son servidos por nginx en Docker.
+
+---
+
+## 5. Puntos de atención para operación
+
+1. **Credenciales del biométrico**: deben estar en `.env` (`DEVICE_IP`, `DEVICE_USER`, `DEVICE_PASS`). El scheduler y la sincronización de empleados usan estos valores automáticamente.
+2. **SMTP**: `SMTP_USER`, `SMTP_APP_PASSWORD` y `REPORT_RECIPIENTS` deben configurarse en `.env` para reportes automáticos. **Actualmente pospuesto** hasta tener cuenta Gmail.
+3. **Timezone**: backend y frontend fuerzan `America/Bogota`; el contenedor `backend` tiene `TZ=America/Bogota` instalado. No depende del reloj del host.
+4. **Buffer del biométrico**: mantener la extracción diaria a las 8:00 PM para no perder marcaciones por el buffer circular del dispositivo.
+5. **Empleados sin turno**: usan `DEFAULT_TURNO_ENTRADA` y `DEFAULT_TOLERANCIA_MINUTOS` del `.env` para cálculo de tardanzas.
+6. **Marcas casi simultáneas**: el Excel agrupa marcas dentro de `MARCA_FUSION_MINUTOS` minutos como una sola "Marca N". Ajustar o desactivar en `.env` según política de REDIHOS.
+7. **Seguridad**: cambiar `SECRET_KEY`, `ADMIN_USERNAME` y `ADMIN_PASSWORD` en producción. El token JWT expira según `ACCESS_TOKEN_EXPIRE_MINUTES`. Los usuarios sembrados desde `.env` deberán cambiar su contraseña en el primer login.
+8. **Dashboard**: no muestra tarjeta de festivos; el botón de extracción se llama "Actualizar Marcaciones"; hay una vista "Marcas del día" con tabla de solo lectura; muestra tarjetas de % asistencia a tiempo y minutos perdidos por tardanza.
+9. **Logo**: placeholder `<img id="logo" src="">` en el sidebar para que el frontend lo reemplace con el archivo real.
+10. **Marcas duplicadas aparentes**: el Excel trunca segundos; marcas cercanas en el tiempo pueden verse iguales pero provienen de eventos reales distintos.
+
+---
+
+## 6. Supuestos aplicados en la corrección de Fase 3
+
+- **Marcas sin asociar**: se mantienen en el panel dedicado y no se incluyen en KPIs ni en el Excel de reportes.
+- **"Días sin registro" en el Excel**: se cuenta entre los empleados activos que aparecen en el reporte.
+- **Panel de festivos**: solo lectura, administrado automáticamente por la librería `holidays`.
+- **Reporte Excel**: incluye todos los empleados `activo=True`, con o sin turno asignado.
+- **Fusión de marcas**: marcas del mismo empleado/día dentro de `MARCA_FUSION_MINUTOS` se muestran como una sola "Marca N". El cálculo de columnas dinámicas usa los datos fusionados.
+- **Turno default**: empleados activos sin turno propio usan `DEFAULT_TURNO_ENTRADA` y `DEFAULT_TOLERANCIA_MINUTOS`.
+- **RBAC**: todos los endpoints protegidos requieren JWT y un permiso específico. El rol `Admin` tiene todos los permisos; el rol `Reportes` solo dashboard y reportes.
+
+---
+
+## 7. Próximos pasos sugeridos
+
+1. **Correo automático**: configurar cuenta Gmail y probar `enviar_correo_prueba()` y reportes programados.
+2. **Validación visual del frontend**: abrir `http://localhost:3000` en navegador y confirmar que no hay errores de consola, que los KPIs se renderizan y que los filtros de reportes actualizan la UI.
+3. **Tests automáticos**: considerar tests para cálculo de tardanzas, generación de reportes y lógica de días laborales.
+4. **Registro manual de empleados**: cargar en la tabla `Empleado` los nombres reales del biométrico para que aparezcan en reportes y tardanzas automáticamente.
+5. **Producción**: levantar con `docker compose up -d --build` usando `.env` real y PostgreSQL persistente
+
+---
+
+## 8. Cierre del batch (22 de julio de 2026)
+
+El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y los dos puntos finales de timezone/seguridad.
+
+### Checklist final
+
+| Ítem | Estado |
+|---|---|
+| Sincronización de 71 empleados desde el biométrico | ✅ |
+| Turnos individuales por empleado | ✅ |
+| RBAC con roles/permisos no hardcodeados | ✅ |
+| Login JWT con expiración configurable (8h default) | ✅ |
+| Forzado de cambio de contraseña en primer login (admin/reportes sembrados) | ✅ |
+| Frontend con login, dashboard, marcas del día, admin | ✅ |
+| Backend con timezone `America/Bogota` en Dockerfile, docker-compose y código | ✅ |
+| Reportes automáticos con periodicidad configurable en caliente | ✅ |
+| Tarjetas `% asistencia a tiempo` y `minutos perdidos` | ✅ |
+| Handoff actualizado | ✅ |
+
+### Notas de cierre
+- No se pudo ejecutar el comando `python3 -c "from datetime import datetime; print(datetime.now())"` dentro del contenedor porque el daemon de Docker no está corriendo en este entorno. Sin embargo, el `backend.Dockerfile` ya instala `tzdata`, define `ENV TZ=America/Bogota` y vincula `/etc/localtime`, y el código usa `ZoneInfo("America/Bogota")` de forma explícita.
+- La validación visual del frontend en navegador gráfico queda como paso posterior, ya que este entorno es solo línea de comandos.

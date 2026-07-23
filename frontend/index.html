@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Asistencia — REDIHOS</title>
+    <meta name="description" content="Panel de control del Sistema de Asistencia Biométrica REDIHOS S.A.S.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-base:    #0b1120;
+            --bg-panel:   rgba(17, 28, 52, 0.85);
+            --border:     rgba(99, 179, 237, 0.12);
+            --accent:     #3b82f6;
+            --accent-glow:rgba(59,130,246,0.35);
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-base);
+            background-image:
+                radial-gradient(ellipse at 20% 20%, rgba(30,64,175,0.15) 0%, transparent 60%),
+                radial-gradient(ellipse at 80% 80%, rgba(124,58,237,0.10) 0%, transparent 60%);
+            color: #e2e8f0;
+            min-height: 100vh;
+        }
+        .glass {
+            background: var(--bg-panel);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+        }
+        .glass-sm { border-radius: 10px; }
+
+        /* Sidebar */
+        #sidebar { width: 240px; min-height: 100vh; background: rgba(10,18,36,0.95); border-right: 1px solid var(--border); }
+        .nav-item { display:flex; align-items:center; gap:10px; padding:10px 16px; border-radius:8px; cursor:pointer; transition:all .2s; color:#94a3b8; font-size:14px; font-weight:500; margin-bottom:4px; }
+        .nav-item:hover, .nav-item.active { background:rgba(59,130,246,0.15); color:#93c5fd; }
+        .nav-item.active { border-left: 3px solid #3b82f6; }
+
+        /* KPI Cards */
+        .kpi-card { background:linear-gradient(135deg,rgba(17,28,52,0.9),rgba(30,41,80,0.7)); border:1px solid var(--border); border-radius:12px; padding:20px; }
+        .kpi-value { font-size:2.4rem; font-weight:700; line-height:1; }
+        .kpi-late  { color:#fb923c; }
+        .kpi-ok    { color:#34d399; }
+        .kpi-blue  { color:#60a5fa; }
+        .kpi-gray  { color:#94a3b8; }
+
+        /* Buttons */
+        .btn-primary { background:linear-gradient(135deg,#2563eb,#1d4ed8); color:white; padding:8px 18px; border-radius:8px; font-weight:600; font-size:13px; border:none; cursor:pointer; transition:all .2s; display:inline-flex; align-items:center; gap:6px; }
+        .btn-primary:hover { background:linear-gradient(135deg,#3b82f6,#2563eb); box-shadow:0 0 20px var(--accent-glow); transform:translateY(-1px); }
+        .btn-primary:disabled { opacity:.5; cursor:not-allowed; transform:none; }
+        .btn-danger  { background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; }
+        .btn-success { background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.3); color:#4ade80; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; }
+        .btn-secondary { background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.3); color:#60a5fa; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; transition:all .2s; }
+        .btn-secondary:hover { background:rgba(59,130,246,0.22); }
+
+        /* Table */
+        .data-table { width:100%; border-collapse:collapse; font-size:13px; }
+        .data-table thead tr { background:rgba(30,58,138,0.4); }
+        .data-table th { padding:12px 16px; text-align:left; font-weight:600; color:#93c5fd; text-transform:uppercase; font-size:11px; letter-spacing:.05em; border-bottom:1px solid var(--border); }
+        .data-table td { padding:11px 16px; border-bottom:1px solid rgba(255,255,255,0.04); color:#cbd5e1; }
+        .data-table tbody tr:hover { background:rgba(59,130,246,0.06); }
+
+        /* Form inputs */
+        .form-input { background:rgba(15,23,42,0.8); border:1px solid rgba(99,179,237,0.2); border-radius:8px; padding:8px 12px; color:#e2e8f0; font-size:13px; width:100%; outline:none; transition:.2s; }
+        .form-input:focus { border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,0.15); }
+        .form-label { font-size:12px; font-weight:500; color:#94a3b8; margin-bottom:4px; display:block; }
+
+        /* Tabs */
+        .tab-btn { padding:8px 18px; border-radius:6px 6px 0 0; font-size:13px; font-weight:500; cursor:pointer; border:none; color:#64748b; background:transparent; transition:.2s; border-bottom:2px solid transparent; }
+        .tab-btn.active { color:#93c5fd; border-bottom:2px solid #3b82f6; }
+        .tab-content { display:none; }
+        .tab-content.active { display:block; }
+
+        /* Progress bar */
+        #progress-bar { display:none; }
+        #progress-bar.visible { display:flex; }
+
+        /* Badge */
+        .badge-late  { background:rgba(239,68,68,0.15); color:#f87171; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
+        .badge-ok    { background:rgba(34,197,94,0.15);  color:#4ade80; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
+        .badge-dept  { background:rgba(99,179,237,0.1);  color:#7dd3fc; padding:2px 8px; border-radius:12px; font-size:11px; }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width:5px; height:5px; }
+        ::-webkit-scrollbar-track { background:transparent; }
+        ::-webkit-scrollbar-thumb { background:#334155; border-radius:4px; }
+
+        /* Checkbox listado */
+        .emp-checkbox { accent-color:#3b82f6; width:15px; height:15px; cursor:pointer; }
+
+        /* Toast */
+        #toast { position:fixed; bottom:24px; right:24px; z-index:9999; display:none; }
+        #toast.visible { display:block; }
+        .toast-inner { padding:12px 20px; border-radius:10px; font-size:13px; font-weight:500; animation:slideUp .3s ease; }
+        @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+
+        @media (max-width:768px) {
+            #sidebar { display:none; }
+        }
+    </style>
+</head>
+<body class="flex">
+
+<!-- LOGIN -->
+<div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center" style="background: radial-gradient(ellipse at 20% 20%, rgba(30,64,175,0.25) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(124,58,237,0.15) 0%, transparent 60%), #0b1120;">
+    <div class="glass p-8 w-full max-w-sm space-y-6">
+        <div class="text-center">
+            <img src="logo.png" alt="Logo REDIHOS" class="h-16 mx-auto mb-4 opacity-90">
+            <h1 class="text-xl font-bold text-white">Sistema de Asistencia</h1>
+            <p class="text-xs text-slate-400 mt-1">REDIHOS S.A.S.</p>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="form-label">Usuario</label>
+                <input type="text" id="login-username" class="form-input" placeholder="admin" onkeydown="if(event.key==='Enter') login()">
+            </div>
+            <div>
+                <label class="form-label">Contraseña</label>
+                <input type="password" id="login-password" class="form-input" placeholder="••••••" onkeydown="if(event.key==='Enter') login()">
+            </div>
+            <p id="login-error" class="text-xs text-red-400 hidden"></p>
+            <button onclick="login()" class="btn-primary w-full justify-center py-2.5">Ingresar</button>
+        </div>
+    </div>
+</div>
+
+<!-- CAMBIO DE CONTRASEÑA OBLIGATORIO -->
+<div id="password-change-screen" class="fixed inset-0 z-50 flex items-center justify-center hidden" style="background: radial-gradient(ellipse at 20% 20%, rgba(30,64,175,0.25) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(124,58,237,0.15) 0%, transparent 60%), #0b1120;">
+    <div class="glass p-8 w-full max-w-sm space-y-6">
+        <div class="text-center">
+            <h1 class="text-xl font-bold text-white">Cambio de contraseña</h1>
+            <p class="text-xs text-slate-400 mt-1">Debes actualizar tu contraseña antes de continuar.</p>
+        </div>
+        <div class="space-y-4">
+            <div>
+                <label class="form-label">Contraseña actual</label>
+                <input type="password" id="pw-actual" class="form-input" placeholder="••••••" onkeydown="if(event.key==='Enter') cambiarPassword()">
+            </div>
+            <div>
+                <label class="form-label">Nueva contraseña</label>
+                <input type="password" id="pw-nuevo" class="form-input" placeholder="••••••" onkeydown="if(event.key==='Enter') cambiarPassword()">
+            </div>
+            <div>
+                <label class="form-label">Confirmar nueva contraseña</label>
+                <input type="password" id="pw-confirmar" class="form-input" placeholder="••••••" onkeydown="if(event.key==='Enter') cambiarPassword()">
+            </div>
+            <p id="pw-change-error" class="text-xs text-red-400 hidden"></p>
+            <button onclick="cambiarPassword()" class="btn-primary w-full justify-center py-2.5">Actualizar contraseña</button>
+        </div>
+    </div>
+</div>
+
+<!-- SIDEBAR -->
+<nav id="sidebar" class="flex flex-col p-4 pt-6 flex-shrink-0">
+    <div class="mb-8 px-2">
+        <img id="logo" src="logo.png" alt="Logo REDIHOS" class="h-16 mb-2 opacity-90">
+        <h1 class="text-base font-bold text-white leading-tight">Sistema de Asistencia</h1>
+        <p class="text-xs text-slate-500 mt-0.5">REDIHOS S.A.S.</p>
+    </div>
+    <div class="flex-1 space-y-1">
+        <div class="nav-item active" onclick="showView('dashboard')" id="nav-dashboard">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
+            Dashboard
+        </div>
+        <div class="nav-item" onclick="showView('marcas')" id="nav-marcas">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Marcas del día
+        </div>
+        <div class="nav-item" onclick="showView('reportes')" id="nav-reportes">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            Generar Reporte
+        </div>
+        <div class="nav-item" onclick="showView('admin')" id="nav-admin">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+            Administración
+        </div>
+    </div>
+    <div class="mt-auto pt-4 border-t border-slate-800 px-2 space-y-2">
+        <div class="text-xs text-slate-400 truncate" id="user-info">—</div>
+        <button onclick="logout()" class="w-full text-left text-xs text-slate-500 hover:text-slate-300">Cerrar sesión</button>
+        <p class="text-xs text-slate-600">Sistema Biométrico v3.0</p>
+    </div>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="flex-1 overflow-auto p-6 space-y-6 min-h-screen">
+
+    <!-- ── BARRA DE PROGRESO ────────────────────────────────────────────────── -->
+    <div id="progress-bar" class="glass p-4 flex items-center gap-4 border-sky-500/30 bg-sky-900/10">
+        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-sky-400"></div>
+        <div>
+            <p class="text-xs font-semibold text-sky-400 uppercase tracking-wider">Extracción en curso</p>
+            <p id="progress-msg" class="text-xs text-slate-300 font-mono mt-0.5">Conectando...</p>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- VISTA: DASHBOARD                                                       -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <div id="view-dashboard">
+        <!-- Header dashboard -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+            <div>
+                <h2 class="text-2xl font-bold text-white">Dashboard</h2>
+                <p class="text-slate-400 text-sm mt-0.5">Resumen del día seleccionado</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <input type="date" id="kpi-date" class="form-input w-40"
+                       onchange="cargarDashboard()">
+                <div class="flex items-center gap-2">
+                    <label class="text-xs text-slate-400">Desde:</label>
+                    <input type="date" id="date-start" class="form-input w-36">
+                    <label class="text-xs text-slate-400">Hasta:</label>
+                    <input type="date" id="date-end" class="form-input w-36">
+                </div>
+                <button id="btn-extraer" onclick="forzarExtraccion()" class="btn-primary">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    Actualizar Marcaciones
+                </button>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+            <div class="kpi-card">
+                <p class="text-xs text-slate-400 uppercase tracking-wider mb-2">Total Marcaciones</p>
+                <div class="kpi-value kpi-blue" id="kpi-total">—</div>
+                <p class="text-xs text-slate-500 mt-1">del día</p>
+            </div>
+            <div class="kpi-card">
+                <p class="text-xs text-slate-400 uppercase tracking-wider mb-2">Con Registro</p>
+                <div class="kpi-value kpi-ok" id="kpi-presentes">—</div>
+                <p class="text-xs text-slate-500 mt-1">empleados</p>
+            </div>
+            <div class="kpi-card">
+                <p class="text-xs text-slate-400 uppercase tracking-wider mb-2">Llegadas Tarde</p>
+                <div class="kpi-value kpi-late" id="kpi-tardanzas">—</div>
+                <p class="text-xs text-slate-500 mt-1">empleados</p>
+            </div>
+            <div class="kpi-card">
+                <p class="text-xs text-slate-400 uppercase tracking-wider mb-2">% Asistencia a Tiempo</p>
+                <div class="kpi-value kpi-ok" id="kpi-tiempo-pct">—</div>
+                <p class="text-xs text-slate-500 mt-1" id="kpi-tiempo-sub">—</p>
+            </div>
+            <div class="kpi-card">
+                <p class="text-xs text-slate-400 uppercase tracking-wider mb-2">Minutos Perdidos</p>
+                <div class="kpi-value kpi-late" id="kpi-minutos-perdidos">—</div>
+                <p class="text-xs text-slate-500 mt-1">por tardanza</p>
+            </div>
+        </div>
+
+        <!-- Tarde hoy + Marcas del día (2 columnas) -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Llegadas tarde -->
+            <div class="glass p-0 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
+                    <h3 class="font-semibold text-white text-sm">Llegadas Tarde Hoy</h3>
+                    <span class="text-xs text-slate-500" id="tardanzas-count"></span>
+                </div>
+                <div class="overflow-auto max-h-72">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Empleado</th>
+                            <th>Área</th>
+                            <th>Llegó</th>
+                            <th>Turno</th>
+                            <th>+ Min</th>
+                        </tr></thead>
+                        <tbody id="tabla-tardanzas">
+                            <tr><td colspan="5" class="text-center py-8 text-slate-500 text-xs">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Marcas del día -->
+            <div class="glass p-0 overflow-hidden">
+                <div class="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
+                    <h3 class="font-semibold text-white text-sm">Marcas del Día</h3>
+                    <input type="date" id="filter-date" onchange="cargarMarcas()"
+                           class="form-input w-36 text-xs py-1">
+                </div>
+                <div class="overflow-auto max-h-72">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Empleado</th>
+                            <th>Hora</th>
+                            <th>Evento</th>
+                        </tr></thead>
+                        <tbody id="tabla-marcas">
+                            <tr><td colspan="3" class="text-center py-8 text-slate-500 text-xs">Cargando...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div><!-- /dashboard -->
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- VISTA: MARCAS DEL DÍA                                                  -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <div id="view-marcas" class="hidden space-y-6">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
+            <div>
+                <h2 class="text-2xl font-bold text-white">Marcas del día</h2>
+                <p class="text-slate-400 text-sm mt-0.5">Registros ya guardados en el sistema para la fecha seleccionada</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <input type="date" id="marcas-date" class="form-input w-40" onchange="cargarMarcasDelDia()">
+                <button onclick="cargarMarcasDelDia()" class="btn-primary text-xs py-2 px-3">↻ Actualizar</button>
+            </div>
+        </div>
+        <div class="glass p-0 overflow-hidden">
+            <div class="overflow-auto max-h-[70vh]">
+                <table class="data-table">
+                    <thead><tr>
+                        <th>Empleado</th>
+                        <th>Fecha</th>
+                        <th>Hora</th>
+                        <th>Tipo evento</th>
+                        <th>ID biométrico</th>
+                    </tr></thead>
+                    <tbody id="tabla-marcas-dia"><tr><td colspan="5" class="text-center py-8 text-slate-500 text-xs">Cargando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- VISTA: REPORTES                                                        -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <div id="view-reportes" class="hidden space-y-6">
+        <div class="mb-6">
+            <h2 class="text-2xl font-bold text-white">Generar Reporte</h2>
+            <p class="text-slate-400 text-sm mt-0.5">Exporta a Excel con el formato dinámico de marcas</p>
+        </div>
+
+        <div class="glass p-6 space-y-6">
+            <!-- Fechas -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="form-label">Fecha de inicio</label>
+                    <input type="date" id="rep-start" class="form-input">
+                </div>
+                <div>
+                    <label class="form-label">Fecha de fin</label>
+                    <input type="date" id="rep-end" class="form-input">
+                </div>
+            </div>
+
+            <!-- Filtro por departamento -->
+            <div>
+                <label class="form-label">Filtrar por área / departamento (opcional)</label>
+                <div id="dept-filter-list" class="flex flex-wrap gap-2 mt-1"></div>
+            </div>
+
+            <!-- Modo de reporte -->
+            <div class="flex items-center justify-between">
+                <label class="form-label mb-0">Modo del reporte</label>
+                <button id="btn-toggle-modo" onclick="toggleReportMode()" class="btn-secondary text-xs py-1.5 px-3">
+                    Entrada / Salida
+                </button>
+            </div>
+
+            <!-- Selección de empleados -->
+            <div>
+                <div class="flex items-center justify-between mb-2">
+                    <label class="form-label mb-0">Selección de empleados</label>
+                    <div class="flex gap-2">
+                        <button onclick="seleccionarTodos(true)"  class="btn-success text-xs py-1 px-3">Todos</button>
+                        <button onclick="seleccionarTodos(false)" class="btn-danger  text-xs py-1 px-3">Ninguno</button>
+                    </div>
+                </div>
+                <input type="text" id="search-emp" placeholder="Buscar empleado..."
+                       class="form-input mb-2" oninput="filtrarListaEmpleados()">
+                <div id="emp-list" class="border border-slate-700/50 rounded-lg overflow-auto max-h-52 divide-y divide-slate-800/50 bg-slate-900/30"></div>
+            </div>
+
+            <button onclick="generarReporte()" class="btn-primary w-full justify-center py-3 text-sm" id="btn-generar">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Generar y Descargar Excel
+            </button>
+        </div>
+    </div><!-- /reportes -->
+
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <!-- VISTA: ADMINISTRACIÓN                                                  -->
+    <!-- ══════════════════════════════════════════════════════════════════════ -->
+    <div id="view-admin" class="hidden space-y-6">
+        <div class="mb-2">
+            <h2 class="text-2xl font-bold text-white">Administración</h2>
+            <p class="text-slate-400 text-sm mt-0.5">Gestiona empleados, turnos, festivos y correo</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="border-b border-slate-700">
+            <button class="tab-btn active" onclick="showTab('empleados')">Empleados</button>
+            <button class="tab-btn"        onclick="showTab('festivos')">Festivos</button>
+            <button class="tab-btn"        onclick="showTab('correo')">Correo</button>
+            <button class="tab-btn"        onclick="showTab('roles')">Usuarios y roles</button>
+        </div>
+
+        <!-- TAB: Empleados -->
+        <div id="tab-empleados" class="tab-content active space-y-4">
+            <div class="glass p-4 space-y-3">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-300">Empleados sincronizados</h3>
+                        <p class="text-xs text-slate-400">Los empleados se obtienen automáticamente desde el biométrico. Edita departamento, hora de entrada y tolerancia por empleado.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span id="sync-status" class="text-xs text-slate-400 font-mono">Inactivo</span>
+                        <button id="btn-sync-empleados" onclick="sincronizarEmpleados()" class="btn-primary">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Sincronizar con dispositivo
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="glass overflow-hidden">
+                <table class="data-table">
+                    <thead><tr>
+                        <th>ID Bio</th>
+                        <th>Nombre</th>
+                        <th>Activo</th>
+                        <th>Departamento</th>
+                        <th>Hora entrada</th>
+                        <th>Tolerancia (min)</th>
+                        <th></th>
+                    </tr></thead>
+                    <tbody id="tabla-empleados"><tr><td colspan="7" class="text-center py-6 text-slate-500 text-xs">Cargando...</td></tr></tbody>
+                </table>
+            </div>
+
+            <!-- Marcas sin asociar -->
+            <div class="glass p-4 mt-6">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-semibold text-orange-400">Marcas sin Empleado Asociado</h3>
+                    <button onclick="cargarMarcasSinAsociar()" class="text-xs text-sky-400 hover:text-sky-300">↻ Actualizar</button>
+                </div>
+                <p class="text-xs text-slate-400 mb-4">Estas marcas provienen del biométrico pero el nombre aún no coincide con ningún Empleado sincronizado. Si el empleado existe en el dispositivo, pulsa "Sincronizar con dispositivo".</p>
+                <div class="overflow-auto max-h-48">
+                    <table class="data-table">
+                        <thead><tr><th>Nombre en Biométrico</th><th>ID en Biométrico</th></tr></thead>
+                        <tbody id="tabla-sin-asociar"><tr><td colspan="2" class="text-center py-4 text-slate-500 text-xs">Cargando...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB: Festivos (solo lectura) -->
+        <div id="tab-festivos" class="tab-content space-y-4">
+            <div class="glass p-5 space-y-3">
+                <h3 class="text-sm font-semibold text-slate-300">Festivos cargados automáticamente</h3>
+                <p class="text-xs text-slate-400">Los festivos colombianos se obtienen de la librería <code class="text-sky-400">holidays</code> y se actualizan automáticamente al iniciar el sistema. No requieren administración manual.</p>
+            </div>
+            <div class="glass overflow-hidden">
+                <table class="data-table">
+                    <thead><tr><th>Fecha</th><th>Descripción</th></tr></thead>
+                    <tbody id="tabla-festivos"><tr><td colspan="2" class="text-center py-6 text-slate-500 text-xs">Cargando...</td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- TAB: Correo -->
+        <div id="tab-correo" class="tab-content space-y-4">
+            <div class="glass p-5 space-y-4">
+                <h3 class="text-sm font-semibold text-slate-300">Configuración de correo automático</h3>
+                <div id="correo-estado" class="text-xs text-slate-400 p-3 rounded-lg bg-slate-900/50 border border-slate-700"></div>
+
+                <!-- Destinatarios -->
+                <div class="space-y-2">
+                    <label class="form-label">Destinatarios</label>
+                    <div class="flex gap-2">
+                        <input type="email" id="new-dest-email" class="form-input text-xs" placeholder="correo@redihos.com">
+                        <button onclick="agregarDestinatario()" class="btn-primary text-xs px-3">Agregar</button>
+                    </div>
+                    <div id="correo-destinatarios" class="flex flex-wrap gap-2"></div>
+                </div>
+
+                <!-- Periodicidad -->
+                <div class="space-y-3 pt-2 border-t border-slate-700/50">
+                    <h4 class="text-xs font-semibold text-slate-300">Programación de reportes</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-2">
+                            <p class="text-xs font-semibold text-slate-300">📅 Reporte Semanal</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <select id="sem-dia" class="form-input text-xs py-1">
+                                    <option value="1">Lunes</option>
+                                    <option value="2">Martes</option>
+                                    <option value="3">Miércoles</option>
+                                    <option value="4">Jueves</option>
+                                    <option value="5">Viernes</option>
+                                    <option value="6">Sábado</option>
+                                    <option value="0">Domingo</option>
+                                </select>
+                                <input type="time" id="sem-hora" class="form-input text-xs py-1">
+                            </div>
+                        </div>
+                        <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-2">
+                            <p class="text-xs font-semibold text-slate-300">📊 Reporte Mensual</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="number" id="men-dia" class="form-input text-xs py-1" min="1" max="31" placeholder="Día">
+                                <input type="time" id="men-hora" class="form-input text-xs py-1">
+                            </div>
+                        </div>
+                    </div>
+                    <button onclick="guardarPeriodicidad()" class="btn-primary text-xs px-4 py-2">Guardar programación</button>
+                </div>
+
+                <button onclick="probarCorreo()" class="btn-primary">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    Enviar correo de prueba
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB: Usuarios y roles -->
+        <div id="tab-roles" class="tab-content space-y-4">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <!-- Usuarios -->
+                <div class="glass p-4 space-y-3">
+                    <h3 class="text-sm font-semibold text-slate-300">Usuarios</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <input type="text" id="new-user-username" class="form-input text-xs" placeholder="Nuevo usuario">
+                        <input type="password" id="new-user-password" class="form-input text-xs" placeholder="Contraseña">
+                        <select id="new-user-rol" class="form-input text-xs"></select>
+                        <button onclick="crearUsuario()" class="btn-primary text-xs">Crear usuario</button>
+                    </div>
+                    <div class="overflow-auto max-h-60">
+                        <table class="data-table">
+                            <thead><tr><th>Usuario</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
+                            <tbody id="tabla-usuarios"><tr><td colspan="4" class="text-center py-4 text-slate-500 text-xs">Cargando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Roles y permisos -->
+                <div class="glass p-4 space-y-3">
+                    <h3 class="text-sm font-semibold text-slate-300">Roles y permisos</h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="new-rol-nombre" class="form-input text-xs" placeholder="Nuevo rol">
+                        <button onclick="crearRol()" class="btn-primary text-xs">Crear rol</button>
+                    </div>
+                    <div class="overflow-auto max-h-60">
+                        <table class="data-table">
+                            <thead><tr><th>Rol</th><th>Permisos</th><th></th></tr></thead>
+                            <tbody id="tabla-roles"><tr><td colspan="3" class="text-center py-4 text-slate-500 text-xs">Cargando...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /admin -->
+
+</main>
+
+<!-- TOAST -->
+<div id="toast">
+    <div id="toast-inner" class="toast-inner"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
