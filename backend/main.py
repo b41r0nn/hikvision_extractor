@@ -4,7 +4,7 @@ API principal del Sistema de Asistencia Biométrica REDIHOS.
 """
 import io
 import os
-import time
+import time as _time
 from contextlib import asynccontextmanager
 from datetime import date, time, timedelta
 from typing import List, Optional
@@ -92,6 +92,8 @@ async def lifespan(app: FastAPI):
 
                     def _backfill():
                         try:
+                            print(f"[EXTRACCION] Disparador: backfill "
+                                  f"(rango {start_backfill} -> {end_backfill})")
                             extractor_hikvision.main(
                                 start_str=start_backfill.isoformat(),
                                 end_str=end_backfill.isoformat(),
@@ -119,7 +121,7 @@ async def lifespan(app: FastAPI):
                     def _watchdog(start_ts: float):
                         if timeout_sec <= 0:
                             return
-                        restante = timeout_sec - (time.time() - start_ts)
+                        restante = timeout_sec - (_time.time() - start_ts)
                         if restante <= 0:
                             print(f"[BACKFILL WATCHDOG] Timeout duro alcanzado "
                                   f"({timeout_sec}s); terminando proceso para "
@@ -127,13 +129,13 @@ async def lifespan(app: FastAPI):
                                   f"estado del biometrico.")
                             os._exit(1)
                         timer = threading.Timer(
-                            restante, _watchdog, args=(time.time(),)
+                            restante, _watchdog, args=(_time.time(),)
                         )
                         timer.daemon = True
                         timer.start()
 
                     watchdog = threading.Timer(
-                        timeout_sec, _watchdog, args=(time.time(),)
+                        timeout_sec, _watchdog, args=(_time.time(),)
                     )
                     watchdog.daemon = True
                     watchdog.start()
@@ -182,6 +184,8 @@ def ejecutar_extraccion(start_date: str, end_date: str):
     try:
         extraction_state["is_running"] = True
         extraction_state["progress"]   = f"Iniciando ({start_date} → {end_date})..."
+        print(f"[EXTRACCION] Disparador: manual "
+              f"(rango {start_date} -> {end_date})")
         extractor_hikvision.main(start_str=start_date, end_str=end_date,
                                   progress_callback=progress_callback)
         # Solo actualizamos ultima_extraccion si el bucle completo terminó
