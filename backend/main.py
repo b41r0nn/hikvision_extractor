@@ -5,8 +5,9 @@ API principal del Sistema de Asistencia Biométrica REDIHOS.
 import io
 import os
 from contextlib import asynccontextmanager
-from datetime import date, time
+from datetime import date, time, timedelta
 from typing import List, Optional
+import threading
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -72,6 +73,51 @@ async def lifespan(app: FastAPI):
             print(f"[CONFIG ERROR] No se pudo inicializar configuración: {e}")
     finally:
         db.close()
+
+    # 4. Backfill automático al arrancar: si el contenedor estuvo apagado,
+    #    recuperamos los días entre la última extracción exitosa y hoy.
+    #    Se ejecuta en background para no retrasar el arranque de la API.
+    try:
+        db = SessionLocal()
+        try:
+            ultima_iso = config_service.get_ultima_extraccion(db)
+            if ultima_iso:
+                ultima_date = date.fromisoformat(ultima_iso[:10])
+                hoy = hoy_bogota()
+                if ultima_date < hoy:
+                    start_backfill = ultima_date + timedelta(days=1)
+                    end_backfill = hoy
+                    print(f"[BACKFILL] Rellenando desde {start_backfill} hasta {end_backfill}...")
+
+                    def _backfill():
+                        try:
+                            extractor_hikvision.main(
+                                start_str=start_backfill.isoformat(),
+                                end_str=end_backfill.isoformat(),
+                                progress_callback=lambda msg: print(f"[BACKFILL] {msg}"),
+                            )
+                            db2 = SessionLocal()
+                            try:
+                                config_service.set_ultima_extraccion(db2)
+                                print(f"[BACKFILL] Exito. Rango {start_backfill} -> {end_backfill} completado.")
+                            finally:
+                                db2.close()
+                        except Exception as e:
+                            print(f"[BACKFILL ERROR] {e}")
+
+                    threading.Thread(
+                        target=_backfill,
+                        name="backfill-extraccion",
+                        daemon=True,
+                    ).start()
+                else:
+                    print("[BACKFILL] Ultima extraccion es hoy; no se requiere relleno.")
+            else:
+                print("[BACKFILL] No hay ultima extraccion registrada; se omite backfill.")
+        finally:
+            db.close()
+    except Exception as e:
+        print(f"[BACKFILL ERROR] No se pudo evaluar backfill: {e}")
 
     print("Iniciando scheduler de tareas en segundo plano...")
     start_scheduler()
