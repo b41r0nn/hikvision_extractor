@@ -102,6 +102,10 @@ async def lifespan(app: FastAPI):
                                 print(f"[BACKFILL] Exito. Rango {start_backfill} -> {end_backfill} completado.")
                             finally:
                                 db2.close()
+                        except extractor_hikvision.DeviceUnavailableError as e:
+                            print(f"[BACKFILL ABORTADO] {e}")
+                            print(f"[BACKFILL] ultima_extraccion_exitosa NO se actualiza; "
+                                  f"se reintentara en el proximo arranque.")
                         except Exception as e:
                             print(f"[BACKFILL ERROR] {e}")
 
@@ -151,7 +155,19 @@ def ejecutar_extraccion(start_date: str, end_date: str):
         extraction_state["progress"]   = f"Iniciando ({start_date} → {end_date})..."
         extractor_hikvision.main(start_str=start_date, end_str=end_date,
                                   progress_callback=progress_callback)
+        # Solo actualizamos ultima_extraccion si el bucle completo terminó
+        # sin DeviceUnavailableError. main() ya hace rollback en ese caso
+        # y re-lanza la excepción, por lo que nunca llegamos a este punto
+        # si la conectividad falló a mitad de un rango.
+        db = SessionLocal()
+        try:
+            config_service.set_ultima_extraccion(db)
+        finally:
+            db.close()
         extraction_state["progress"] = "Extracción completada."
+    except extractor_hikvision.DeviceUnavailableError as e:
+        extraction_state["progress"] = f"Dispositivo no disponible: {e}"
+        print(f"[EXTRACCION ABORTADA] {e}")
     except Exception as e:
         extraction_state["progress"] = f"Error: {e}"
         print(f"[EXTRACCION ERROR] {e}")

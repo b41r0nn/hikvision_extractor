@@ -6,12 +6,22 @@ Adaptado para la Fase 2: Guarda los registros en la base de datos PostgreSQL/SQL
 
 import os
 import uuid
+import socket
 import threading
 import requests
 import argparse
 from datetime import date, timedelta, datetime
 from requests.auth import HTTPDigestAuth
 from dotenv import load_dotenv
+
+
+class DeviceUnavailableError(Exception):
+    """El biométrico no responde a la red. Distinto de una respuesta
+    legítima vacía (ej. un domingo sin marcaciones). El llamador debe
+    detener el avance del rango: reintentar días ya completados es
+    barato por el dedup existente, y los días restantes se recuperan
+    automáticamente en el próximo arranque con un backfill nuevo."""
+    pass
 
 # Cargar variables de entorno desde .env si existe
 load_dotenv()
@@ -71,15 +81,14 @@ def fetch_range(start_iso, end_iso):
                                   auth=HTTPDigestAuth(USER, PASS), timeout=15)
                 r.raise_for_status()
                 data = r.json()
-            except requests.exceptions.ConnectionError:
-                print(f"  [ERROR] Sin conexion a {IP}")
-                break
+            except requests.exceptions.ConnectionError as e:
+                raise DeviceUnavailableError(f"Sin conexion a {IP}: {e}") from e
+            except requests.exceptions.Timeout as e:
+                raise DeviceUnavailableError(f"Timeout conectando a {IP}: {e}") from e
             except requests.exceptions.HTTPError as e:
-                print(f"  [ERROR] HTTP {e.response.status_code}")
-                break
-            except Exception as e:
-                print(f"  [ERROR] {e}")
-                break
+                raise DeviceUnavailableError(f"HTTP {e.response.status_code} desde {IP}") from e
+            except requests.exceptions.RequestException as e:
+                raise DeviceUnavailableError(f"Fallo de red con {IP}: {e}") from e
 
             batch = data.get("AcsEvent", {}).get("InfoList", [])
             total = data.get("AcsEvent", {}).get("totalMatches", 0)
@@ -230,6 +239,20 @@ def main(start_str=None, end_str=None, progress_callback=None):
     if progress_callback:
         progress_callback(f"Conectando al dispositivo para extraer desde {start} hasta {end}...")
 
+    # Check rápido de conectividad: socket connect al puerto 80 con timeout
+    # corto. Si falla, abortamos antes de gastar timeouts de 15s por cada
+    # sub-consulta. ICMP puede estar bloqueado por firewall del dispositivo,
+    # por eso TCP al puerto HTTP es más confiable.
+    try:
+        with socket.create_connection((IP, 80), timeout=3):
+            pass
+    except (socket.timeout, ConnectionRefusedError, OSError) as e:
+        msg = f"[ERROR] Biométrico no responde, abortando extracción ({e})"
+        print(msg)
+        if progress_callback:
+            progress_callback(msg)
+        raise DeviceUnavailableError(f"Biométrico {IP}:80 no responde: {e}") from e
+
     total_eventos = 0
     current = start
 
@@ -240,8 +263,23 @@ def main(start_str=None, end_str=None, progress_callback=None):
             print(f"\n{msg_day}")
             if progress_callback:
                 progress_callback(msg_day)
-                
-            raw, total_esperado = fetch_day(current)
+
+            try:
+                raw, total_esperado = fetch_day(current)
+            except DeviceUnavailableError as e:
+                # Falla de red real: el día actual NO se pudo obtener.
+                # Hacemos rollback de lo que estuviera pendiente y detenemos
+                # el avance. Los días anteriores ya commiteados se conservan;
+                # el llamador (main.py) NO debe actualizar ultima_extraccion
+                # a algo posterior al último día exitoso.
+                msg = f"  [ERROR] {current}: {e} -> deteniendo bucle"
+                print(msg)
+                if progress_callback:
+                    progress_callback(msg)
+                db.rollback()
+                db.close()
+                raise
+
             evts  = parse_events(raw, current)
             guardados = save_to_db(db, evts, include_all=args.all)
 
@@ -265,14 +303,20 @@ def main(start_str=None, end_str=None, progress_callback=None):
                 config_service.clear_alerta_extraccion(db, current)
 
             current += timedelta(days=1)
-            
+
         db.commit()
+    except DeviceUnavailableError:
+        # Ya cerramos la sesión y rollbackeamos dentro del bucle.
+        raise
     except Exception as e:
         print(f"Error procesando {current}: {e}")
         db.rollback()
         raise e
     finally:
-        db.close()
+        try:
+            db.close()
+        except Exception:
+            pass
 
     msg_fin = f"Extracción completada. {total_eventos} nuevos registros."
     print(f"\n{'='*50}\n{msg_fin}\n{'='*50}")
