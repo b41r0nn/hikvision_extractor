@@ -4,6 +4,7 @@ API principal del Sistema de Asistencia Biométrica REDIHOS.
 """
 import io
 import os
+import time
 from contextlib import asynccontextmanager
 from datetime import date, time, timedelta
 from typing import List, Optional
@@ -108,6 +109,34 @@ async def lifespan(app: FastAPI):
                                   f"se reintentara en el proximo arranque.")
                         except Exception as e:
                             print(f"[BACKFILL ERROR] {e}")
+
+                    # Techo duro: si el backfill supera BACKFILL_TIMEOUT_SEC,
+                    # el watchdog mata el proceso. La política restart: always
+                    # de docker-compose levantará el contenedor de nuevo, y
+                    # el siguiente arranque reintentará desde donde quedó.
+                    timeout_sec = int(os.getenv("BACKFILL_TIMEOUT_SEC", "600"))
+
+                    def _watchdog(start_ts: float):
+                        if timeout_sec <= 0:
+                            return
+                        restante = timeout_sec - (time.time() - start_ts)
+                        if restante <= 0:
+                            print(f"[BACKFILL WATCHDOG] Timeout duro alcanzado "
+                                  f"({timeout_sec}s); terminando proceso para "
+                                  f"forzar reinicio. Loguear este caso y revisar "
+                                  f"estado del biometrico.")
+                            os._exit(1)
+                        timer = threading.Timer(
+                            restante, _watchdog, args=(time.time(),)
+                        )
+                        timer.daemon = True
+                        timer.start()
+
+                    watchdog = threading.Timer(
+                        timeout_sec, _watchdog, args=(time.time(),)
+                    )
+                    watchdog.daemon = True
+                    watchdog.start()
 
                     threading.Thread(
                         target=_backfill,
