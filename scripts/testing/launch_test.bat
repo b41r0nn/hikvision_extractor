@@ -12,4 +12,4 @@ set "DATABASE_URL=%DB_URL%"
 set "PYTHONUNBUFFERED=1"
 
 cd /d "%WD%"
-"%PY%" -u "%WD%\test_evidencia\run_with_timestamps.py" "%LOG%" "%PY%" -u -m uvicorn backend.main:app --host 127.0.0.1 --port %PORT% --log-level info
+"%PY%" -u "%WD%\scripts\testing\run_with_timestamps.py" "%LOG%" "%PY%" -u -m uvicorn backend.main:app --host 127.0.0.1 --port %PORT% --log-level info
