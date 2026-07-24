@@ -3,8 +3,8 @@
 **Empresa:** REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S (REDIHOS)  
 **Fase:** 3 — Servicio web con PostgreSQL, dashboard, reportes automáticos y panel de administración  
 **Stack:** FastAPI + Uvicorn + PostgreSQL + Nginx + APScheduler + Docker  
-**Última actualización:** 22 de julio de 2026  
-**Estado:** Batch de cambios cerrado
+**Última actualización:** 24 de julio de 2026  
+**Estado:** Batch de cambios cerrado; se agregó backfill automático post-cierre
 
 ---
 
@@ -100,6 +100,13 @@
 - `docker-compose.yml` también exporta `TZ=America/Bogota` al contenedor backend.
 - El frontend sigue usando `hoy()` con `timeZone: 'America/Bogota'`.
 
+### 2.10 Backfill automático al arrancar el backend
+- Si el contenedor estuvo apagado y la última extracción exitosa (`ultima_extraccion_exitosa`) es anterior a `hoy_bogota()`, el `lifespan` dispara un hilo en background que extrae el rango `[última+1, hoy]`.
+- Usa `extractor_hikvision.main(start_str, end_str)`; el lock interno del extractor serializa las llamadas al dispositivo para evitar pisar otras extracciones.
+- Si nunca se registró una extracción exitosa (sistema nuevo), no se dispara nada automático; se espera la primera extracción manual o el job de las 8:00 PM.
+- Al finalizar sin error, actualiza `ultima_extraccion_exitosa` con la hora actual UTC.
+- El job programado a las 8:00 PM se mantiene sin cambios.
+
 ---
 
 ## 3. Flujo end-to-end
@@ -171,7 +178,7 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 1. **Credenciales del biométrico**: deben estar en `.env` (`DEVICE_IP`, `DEVICE_USER`, `DEVICE_PASS`). El scheduler y la sincronización de empleados usan estos valores automáticamente.
 2. **SMTP**: `SMTP_USER`, `SMTP_APP_PASSWORD` y `REPORT_RECIPIENTS` deben configurarse en `.env` para reportes automáticos. **Actualmente pospuesto** hasta tener cuenta Gmail.
 3. **Timezone**: backend y frontend fuerzan `America/Bogota`; el contenedor `backend` tiene `TZ=America/Bogota` instalado. No depende del reloj del host.
-4. **Buffer del biométrico**: mantener la extracción diaria a las 8:00 PM para no perder marcaciones por el buffer circular del dispositivo.
+4. **Buffer del biométrico**: mantener la extracción diaria a las 8:00 PM para no perder marcaciones por el buffer circular del dispositivo. Además, al arrancar el contenedor se hace backfill automático desde el día siguiente a la última extracción exitosa hasta hoy.
 5. **Empleados sin turno**: usan `DEFAULT_TURNO_ENTRADA` y `DEFAULT_TOLERANCIA_MINUTOS` del `.env` para cálculo de tardanzas.
 6. **Marcas casi simultáneas**: el Excel agrupa marcas dentro de `MARCA_FUSION_MINUTOS` minutos como una sola "Marca N". Ajustar o desactivar en `.env` según política de REDIHOS.
 7. **Seguridad**: cambiar `SECRET_KEY`, `ADMIN_USERNAME` y `ADMIN_PASSWORD` en producción. El token JWT expira según `ACCESS_TOKEN_EXPIRE_MINUTES`. Los usuarios sembrados desde `.env` deberán cambiar su contraseña en el primer login.
@@ -225,3 +232,4 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 ### Notas de cierre
 - No se pudo ejecutar el comando `python3 -c "from datetime import datetime; print(datetime.now())"` dentro del contenedor porque el daemon de Docker no está corriendo en este entorno. Sin embargo, el `backend.Dockerfile` ya instala `tzdata`, define `ENV TZ=America/Bogota` y vincula `/etc/localtime`, y el código usa `ZoneInfo("America/Bogota")` de forma explícita.
 - La validación visual del frontend en navegador gráfico queda como paso posterior, ya que este entorno es solo línea de comandos.
+- **Tag v0.0** apunta al checkpoint inicial funcional; **tag v1.0** apunta a la versión actual con backfill, Alembic, fix de paginación y alertas de extracción incompleta.
