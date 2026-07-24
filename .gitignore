@@ -7,3 +7,6 @@ __pycache__/
 .Python
 *.db
 *.sqlite3
+
+# Evidencia local de pruebas (BD SQLite + logs + scripts de test)
+test_evidencia/
