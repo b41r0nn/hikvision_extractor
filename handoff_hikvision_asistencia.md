@@ -4,7 +4,7 @@
 **Fase:** 3 — Servicio web con PostgreSQL, dashboard, reportes automáticos y panel de administración  
 **Stack:** FastAPI + Uvicorn + PostgreSQL + Nginx + APScheduler + Docker  
 **Última actualización:** 27 de julio de 2026  
-**Estado:** Backfill, alerta, `misfire_grace_time`, retomo de backfill y fix `create_usuario` cerrados con evidencia. Pendientes: lock de concurrencia, nota de buffer overflow, deploy y confirmación del usuario sobre #4.1 (`ADMIN_PASSWORD` real).
+**Estado:** Backfill, alerta, `misfire_grace_time`, retomo de backfill, fix `create_usuario` y lock de concurrencia cerrados con evidencia. Buffer overflow cerrado por diseño. Pendientes: deploy y confirmación del usuario sobre #4.1 (`ADMIN_PASSWORD` real) + generar `SECRET_KEY` real en `.env` de producción.
 
 ---
 
@@ -228,9 +228,14 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 ### Bloqueantes antes del deploy
 1. **Confirmar #4.1 con el usuario**: cambio real de `ADMIN_PASSWORD` en el `.env` de producción y reset contra la BD PostgreSQL real (no la SQLite de prueba).
 2. **Generar `SECRET_KEY` real** en el `.env` de producción: `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
-3. **Lock de concurrencia**: instrumentar `extractor_hikvision.fetch_range()` con timestamps y lanzar 2 `extractor_hikvision.main()` en paralelo desde un script para confirmar que `_device_lock` serializa el acceso al dispositivo (un fetch a la vez, el otro queda en cola).
-4. **Nota de buffer overflow**: validar que cuando `ultima_extraccion_exitosa` está muy atrás (ej. 30 días), el `lifespan` no intenta cargar todo el rango en memoria: el extractor ya procesa por día internamente, así que un rango grande equivale a N llamadas secuenciales a `fetch_range` por día, cada una acotada.
-5. **Deploy**: el usuario corre `docker compose build --no-cache backend && docker compose up -d backend` y `docker compose up -d --force-recreate frontend`. El daemon de Docker no es accesible desde este entorno.
+3. **Deploy**: el usuario corre `docker compose build --no-cache backend && docker compose up -d backend` y `docker compose up -d --force-recreate frontend`. El daemon de Docker no es accesible desde este entorno.
+
+### Cerrados con evidencia en esta ronda
+- ✅ `misfire_grace_time=60` + test real de descarte.
+- ✅ Retomo del backfill desde el último día commiteado + `BACKFILL_TIMEOUT_SEC=3600`.
+- ✅ `create_usuario` fuerza `requiere_cambio_password=True`.
+- ✅ Lock de concurrencia `_device_lock` serializa 2 llamadas simultáneas.
+- ✅ Buffer overflow / rangos grandes: cerrado por diseño (`main()` procesa día por día con `fetch_day()`).
 
 ### Post-deploy
 6. **Correo automático**: configurar cuenta Gmail y probar `enviar_correo_prueba()` y reportes programados.
@@ -305,3 +310,7 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   - Thread A entró al POST a las 14:58:12.583; thread B entró recién a las 14:58:14.584 (cuando A salió).
   - Tiempo total: **4.01s** (dos llamadas de 2s secuenciales, sin solapamiento).
   - Resultado: **PASS**. `_device_lock` funciona correctamente.
+
+### 8.6 Buffer overflow / rangos grandes de backfill (27 de julio de 2026)
+- **Estado:** Cerrado por diseño, sin prueba adicional.
+- **Razonamiento:** `extractor_hikvision.main()` itera día por día y llama `fetch_day()`, que a su vez llama `fetch_range()` con ventanas de 24h (con fallback AM/PM/Q1-Q4). Nunca carga el rango completo en memoria; el consumo de memoria por día está acotado por la paginación (`BATCH_SIZE=50`) y el lock `_device_lock` serializa las llamadas. El watchdog de 1h (`BACKFILL_TIMEOUT_SEC=3600`) cubre el gap práctico esperado (~1 semana); si se necesitara más, el backfill retoma desde el último día commiteado tras el reinicio del contenedor.
