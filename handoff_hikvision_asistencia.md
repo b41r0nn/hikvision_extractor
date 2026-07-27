@@ -314,3 +314,22 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 ### 8.6 Buffer overflow / rangos grandes de backfill (27 de julio de 2026)
 - **Estado:** Cerrado por diseño, sin prueba adicional.
 - **Razonamiento:** `extractor_hikvision.main()` itera día por día y llama `fetch_day()`, que a su vez llama `fetch_range()` con ventanas de 24h (con fallback AM/PM/Q1-Q4). Nunca carga el rango completo en memoria; el consumo de memoria por día está acotado por la paginación (`BATCH_SIZE=50`) y el lock `_device_lock` serializa las llamadas. El watchdog de 1h (`BACKFILL_TIMEOUT_SEC=3600`) cubre el gap práctico esperado (~1 semana); si se necesitara más, el backfill retoma desde el último día commiteado tras el reinicio del contenedor.
+
+---
+
+## 9. Problemas actuales / bloqueantes abiertos
+
+| # | Problema | Impacto | Owner | Estado |
+|---|---|---|---|---|
+| 1 | `ADMIN_PASSWORD` del `.env` de producción aún no se ha cambiado ni reseteado en PostgreSQL real | Riesgo de acceso con credencial por defecto | Usuario | Pendiente (#4.1) |
+| 2 | `SECRET_KEY` de producción no generado | Tokens JWT firmados con valor de ejemplo/documentación | Usuario | Pendiente |
+| 3 | Deploy a producción no realizado | Sistema aún no corre en Docker real | Usuario | Pendiente |
+| 4 | Cuenta SMTP/Gmail no configurada | Reportes automáticos por correo no funcionan | Usuario | Post-deploy |
+| 5 | Validación visual del frontend en navegador | UI no verificada gráficamente | Usuario | Post-deploy |
+| 6 | Registro manual de empleados en tabla `Empleado` | 36 nombres del biométrico aún sin asociar; reportes los muestran sin nombre | Usuario | Post-deploy |
+| 7 | Buffer overflow en backfill de rangos grandes | **Mitigado por diseño**: procesamiento día por día con `fetch_day()` + `BATCH_SIZE=50` + `_device_lock` + watchdog 1h | Cerrado | No requiere acción |
+
+### Notas
+- Los ítems 1, 2 y 3 son **bloqueantes antes del deploy**.
+- Los ítems 4, 5 y 6 son **post-deploy**; no impiden que el sistema funcione, pero limitan funcionalidad.
+- El ítem 7 queda documentado como cerrado por diseño; no se hará prueba adicional.
