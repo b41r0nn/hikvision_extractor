@@ -65,7 +65,7 @@ def schedule_reporte_semanal():
         hour=cfg["hora"],
         minute=cfg["minuto"],
         id="reporte_semanal",
-        misfire_grace_time=None,
+        misfire_grace_time=60,
         coalesce=True,
         replace_existing=True,
     )
@@ -86,7 +86,7 @@ def schedule_reporte_mensual():
         hour=cfg["hora"],
         minute=cfg["minuto"],
         id="reporte_mensual",
-        misfire_grace_time=None,
+        misfire_grace_time=60,
         coalesce=True,
         replace_existing=True,
     )
@@ -101,15 +101,15 @@ def reschedule_report_jobs():
 
 def start_scheduler():
     # Configuración común a todos los jobs:
-    # - misfire_grace_time=None: si el contenedor estuvo caído a la hora
-    #   programada, el run "missed" NO se ejecuta al rearrancar; se espera
-    #   a la próxima ocurrencia. Evita la "extracción misteriosa" al
-    #   levantar el backend después de la hora del job.
-    # - coalesce=True: si APScheduler hubiera acumulado varios runs
-    #   missed, los colapsa en uno solo. Con misfire_grace_time=None
-    #   en la práctica nunca hay runs missed que coalescer, pero lo
-    #   dejamos explícito por defensa.
-    common = dict(misfire_grace_time=None, coalesce=True, replace_existing=True)
+    # - misfire_grace_time=60: si el contenedor estuvo caído a la hora
+    #   programada, el run "missed" SOLO se ejecuta al rearrancar si el
+    #   retraso es menor o igual a 60 segundos. Si el retraso supera los
+    #   60s, APScheduler descarta ese run y espera la próxima ocurrencia.
+    #   Esto evita la "extracción misteriosa" al levantar el backend
+    #   horas después de la hora del job.
+    # - coalesce=True: si acumuló varios runs missed, los colapsa en uno
+    #   solo (relevante principalmente durante el grace time).
+    common = dict(misfire_grace_time=60, coalesce=True, replace_existing=True)
 
     # Sincronización de empleados a las 7:00 AM (antes del reporte semanal)
     scheduler.add_job(tarea_sync_empleados_diaria, "cron", hour=7, minute=0,
