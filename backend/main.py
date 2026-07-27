@@ -490,6 +490,7 @@ def create_usuario(
         password_hash=get_password_hash(req.password),
         rol_id=req.rol_id,
         activo=req.activo,
+        requiere_cambio_password=True,
     )
     db.add(nuevo)
     db.commit()
