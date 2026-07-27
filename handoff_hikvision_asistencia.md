@@ -3,8 +3,8 @@
 **Empresa:** REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S (REDIHOS)  
 **Fase:** 3 — Servicio web con PostgreSQL, dashboard, reportes automáticos y panel de administración  
 **Stack:** FastAPI + Uvicorn + PostgreSQL + Nginx + APScheduler + Docker  
-**Última actualización:** 24 de julio de 2026  
-**Estado:** Batch de cambios cerrado; se agregó backfill automático post-cierre
+**Última actualización:** 27 de julio de 2026  
+**Estado:** Backfill, alerta, `misfire_grace_time`, retomo de backfill y fix `create_usuario` cerrados con evidencia. Pendientes: lock de concurrencia, nota de buffer overflow, deploy y confirmación del usuario sobre #4.1 (`ADMIN_PASSWORD` real).
 
 ---
 
@@ -92,6 +92,7 @@
 - `SECRET_KEY` leído de `.env`; el token JWT expira según `ACCESS_TOKEN_EXPIRE_MINUTES` (default 8 horas = 480 minutos).
 - Usuario admin por defecto configurable en `.env` (`ADMIN_USERNAME`, `ADMIN_PASSWORD`).
 - **Forzado de cambio de contraseña en primer login**: los usuarios sembrados desde `.env` (`admin` y `reportes`) tienen `requiere_cambio_password=True`. El login devuelve esa bandera; el frontend bloquea la app hasta que cambien la contraseña vía `POST /api/auth/cambiar-password`. Tras el cambio la bandera pasa a `False`.
+- **Usuarios creados por el admin** también nacen con `requiere_cambio_password=True` (`backend/main.py:488-494`). Esto mantiene consistencia con los usuarios sembrados y evita que una contraseña temporal asignada por el admin quede viva indefinidamente.
 
 ### 2.9 Zona horaria del backend: America/Bogota
 - Se agregó `backend/timezone.py` con helpers `hoy_bogota()` y `ahora_bogota()` usando `ZoneInfo("America/Bogota")`.
@@ -106,6 +107,28 @@
 - Si nunca se registró una extracción exitosa (sistema nuevo), no se dispara nada automático; se espera la primera extracción manual o el job de las 8:00 PM.
 - Al finalizar sin error, actualiza `ultima_extraccion_exitosa` con la hora actual UTC.
 - El job programado a las 8:00 PM se mantiene sin cambios.
+
+### 2.11 Alerta de extracción incompleta (`extraccion_incompleta_dias`)
+- Cuando el dispositivo reporta `totalMatches` para un día pero la extracción (incluso con el fallback AM/PM/Q1-Q4) devuelve menos eventos, `config_service.add_alerta_extraccion(db, fecha, esperado, obtenido)` persiste el gap en la clave `extraccion_incompleta_dias` de la tabla `Configuracion` (JSON).
+- Se mantiene solo los últimos 14 días (`ALERTAS_MAX_RECIENTES`); si ya existe una alerta para la fecha, solo se actualiza cuando el nuevo gap es mayor.
+- `/api/status` expone `alerta_extraccion_incompleta` (bool) y `extraccion_incompleta` (lista de `{fecha, esperado, obtenido, registrado_en}`). `alerta_retraso_extraccion` y `alerta_extraccion_incompleta` son independientes: una alerta de gap no se mezcla con la de "extracción atrasada > 26h".
+- Frontend: el banner `<div id="extraccion-incompleta-alerta">` (`frontend/index.html:208`) se renderiza desde `mostrarAvisoExtraccion()` (`frontend/app.js:224-277`) leyendo los dos campos de `/api/status`; cada fecha de la lista se muestra como una línea `Extracción del <f> puede estar incompleta (<obtenido> de <esperado> eventos)`.
+
+#### Evidencia de la verificación (27 de julio de 2026)
+- Procedimiento reproducible en `test_evidencia/test_alerta.py`.
+- Pasos ejecutados:
+  1. `arrancar_alerta.bat` levanta uvicorn en `127.0.0.1:18002` con `DATABASE_URL=sqlite:///test_evidencia/evidencia.db`. El `lifespan` corrió Alembic, festivos, RBAC, config y detectó `ultima >= hoy`, por lo que **no se disparó backfill** (logs en `test_evidencia/logs/test_alerta_18002.log`).
+  2. `reset_admin_password.py` reseteó la contraseña a `Ingreso2026*` (la del `.env`) y dejó `requiere_cambio_password=False`.
+  3. Login `POST /api/auth/login` con `admin / Ingreso2026*` → JWT con rol `Admin` y los 7 permisos.
+  4. `config_service.add_alerta_extraccion(db, date(2026,7,23), esperado=132, obtenido=120)` insertó la alerta.
+  5. `GET /api/status` con el JWT devolvió:
+     - `ultima_extraccion_exitosa = 2026-07-27T16:04:11.219562+00:00` (`horas_desde_ultima_extraccion = 3.5`).
+     - `alerta_retraso_extraccion = false` (no se dispara, está dentro de las 26h).
+     - `alerta_extraccion_incompleta = true`.
+     - `extraccion_incompleta = [{"fecha": "2026-07-23", "esperado": 132, "obtenido": 120, "registrado_en": "2026-07-27T19:36:06.884259+00:00"}]`.
+  6. Verificación estática: `<div id="extraccion-incompleta-alerta">` existe en `frontend/index.html:208`; `app.js:226,254` lo referencia; `app.js:270-272` lo hace visible cuando `alerta_extraccion_incompleta` es `true` y hay elementos en `extraccion_incompleta`.
+- Resultado: `test_evidencia/logs/test_alerta_resultado.txt` → `[RESULTADO] test_alerta: PASS`.
+- Proceso cerrado al terminar.
 
 ---
 
@@ -202,11 +225,18 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 
 ## 7. Próximos pasos sugeridos
 
-1. **Correo automático**: configurar cuenta Gmail y probar `enviar_correo_prueba()` y reportes programados.
-2. **Validación visual del frontend**: abrir `http://localhost:3000` en navegador y confirmar que no hay errores de consola, que los KPIs se renderizan y que los filtros de reportes actualizan la UI.
-3. **Tests automáticos**: considerar tests para cálculo de tardanzas, generación de reportes y lógica de días laborales.
-4. **Registro manual de empleados**: cargar en la tabla `Empleado` los nombres reales del biométrico para que aparezcan en reportes y tardanzas automáticamente.
-5. **Producción**: levantar con `docker compose up -d --build` usando `.env` real y PostgreSQL persistente
+### Bloqueantes antes del deploy
+1. **Confirmar #4.1 con el usuario**: cambio real de `ADMIN_PASSWORD` en el `.env` de producción y reset contra la BD PostgreSQL real (no la SQLite de prueba).
+2. **Generar `SECRET_KEY` real** en el `.env` de producción: `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+3. **Lock de concurrencia**: instrumentar `extractor_hikvision.fetch_range()` con timestamps y lanzar 2 `extractor_hikvision.main()` en paralelo desde un script para confirmar que `_device_lock` serializa el acceso al dispositivo (un fetch a la vez, el otro queda en cola).
+4. **Nota de buffer overflow**: validar que cuando `ultima_extraccion_exitosa` está muy atrás (ej. 30 días), el `lifespan` no intenta cargar todo el rango en memoria: el extractor ya procesa por día internamente, así que un rango grande equivale a N llamadas secuenciales a `fetch_range` por día, cada una acotada.
+5. **Deploy**: el usuario corre `docker compose build --no-cache backend && docker compose up -d backend` y `docker compose up -d --force-recreate frontend`. El daemon de Docker no es accesible desde este entorno.
+
+### Post-deploy
+6. **Correo automático**: configurar cuenta Gmail y probar `enviar_correo_prueba()` y reportes programados.
+7. **Validación visual del frontend**: abrir `http://localhost:3000` en navegador y confirmar que no hay errores de consola, que los KPIs se renderizan y que los filtros de reportes actualizan la UI.
+8. **Tests automáticos**: considerar tests para cálculo de tardanzas, generación de reportes y lógica de días laborales.
+9. **Registro manual de empleados**: cargar en la tabla `Empleado` los nombres reales del biométrico para que aparezcan en reportes y tardanzas automáticamente.
 
 ---
 
@@ -232,4 +262,37 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 ### Notas de cierre
 - No se pudo ejecutar el comando `python3 -c "from datetime import datetime; print(datetime.now())"` dentro del contenedor porque el daemon de Docker no está corriendo en este entorno. Sin embargo, el `backend.Dockerfile` ya instala `tzdata`, define `ENV TZ=America/Bogota` y vincula `/etc/localtime`, y el código usa `ZoneInfo("America/Bogota")` de forma explícita.
 - La validación visual del frontend en navegador gráfico queda como paso posterior, ya que este entorno es solo línea de comandos.
-- **Tag v0.0** apunta al checkpoint inicial funcional; **tag v1.0** apunta a la versión actual con backfill, Alembic, fix de paginación y alertas de extracción incompleta.
+- **Tag v0.0** apunta al checkpoint inicial funcional; **tag v1.0** apunta a la versión actual con backfill, Alembic, fix de paginación, alerta `extraccion_incompleta_dias` y banner del dashboard.
+
+### 8.1 Verificaciones de la alerta (27 de julio de 2026)
+- `test_evidencia/test_alerta.py` y `test_evidencia/logs/test_alerta_resultado.txt` documentan el flujo completo (inserción → `/api/status` → banner).
+- `test_evidencia/arrancar_alerta.bat` levanta uvicorn en `:18002` con la BD de prueba.
+- uvicorn queda **detenido** al terminar cada corrida para no contaminar el puerto.
+
+### 8.2 Fix y verificación de `misfire_grace_time` (27 de julio de 2026)
+- **Bug:** `misfire_grace_time=None` en los 4 jobs del scheduler (`sync_empleados_diaria`, `extraccion_diaria`, `reporte_semanal`, `reporte_mensual`). Según la documentación oficial de APScheduler, `None` significa grace time infinito (el job corre sin importar cuán tarde esté), lo opuesto a la intención original.
+- **Fix:** cambiado a `misfire_grace_time=60` en los 4 `add_job` (`backend/scheduler.py` líneas 68, 89, 112). El comentario explicativo fue corregido con la semántica real.
+- **Test real:** `test_evidencia/test_misfire_grace_20260727_2018.py` + `test_evidencia/logs/test_misfire_grace_20260727_144457.log`.
+  - Job `job_missed_5min` (retraso ~300s): **NO corrió**; APScheduler registró: `Run time of job ... was missed by 0:05:00.024490`.
+  - Job `job_in_grace_30sec` (retraso ~30s): **SÍ corrió**.
+  - Resultado: **PASS**.
+
+### 8.3 Verificación de retomo del backfill y ajuste de watchdog (27 de julio de 2026)
+- **Supuesto a validar:** si el watchdog mata el proceso a mitad de un backfill de varios días, el siguiente arranque retoma desde el último día commiteado, no desde el principio.
+- **Test:** `test_evidencia/test_backfill_resume_20260727_2026.py` + `test_evidencia/logs/test_backfill_resume_20260727_144954.log` + `test_evidencia/mock_backfill_uvicorn.py`.
+  - Simuló un gap de 5 días (ultima = hoy − 5).
+  - Mock del extractor commiteó 1 registro por día, actualizó `ultima_extraccion_exitosa` y durmió 10s.
+  - Después de 2 días commiteados se mató el proceso (`kill`).
+  - Al reiniciar, el backfill retomó desde el día 3 y completó los 5 días.
+  - BD final: `registros=5`, `ultima_extraccion_exitosa=hoy`.
+  - Resultado: **PASS**.
+- **Decisión:** se subió `BACKFILL_TIMEOUT_SEC` de `600` a `3600` en `.env.example` (1h cubre ~1 semana de gap con margen, dado ~80s/día). El watchdog sigue activo; no se deshabilita.
+
+### 8.4 Fix de seguridad y documentación de SECRET_KEY (27 de julio de 2026)
+- **Fix:** `create_usuario` en `backend/main.py:488-494` ahora setea `requiere_cambio_password=True` para todo usuario nuevo creado por el admin.
+- **Evidencia:** `test_evidencia/test_create_user_password_change_20260727_2026.py` + `test_evidencia/logs/test_create_user_password_change_20260727_145205.log`.
+  - `POST /api/usuarios` creó `testuser_145208` (rol Reportes).
+  - Query a BD: `requiere_cambio_password=1`.
+  - Resultado: **PASS**.
+- **SECRET_KEY:** `.env.example` ahora documenta que el valor debe generarse con `python -c "import secrets; print(secrets.token_urlsafe(32))"` y no copiarse literalmente. Se generó un ejemplo real y se pegó como ilustración (no se aplicó al `.env` real de producción; eso lo hace el usuario a mano).
+- **Pendiente confirmado por el usuario:** #4.1 (cambio real de `ADMIN_PASSWORD` en producción y reset contra PostgreSQL) queda fuera del alcance de este entorno.
