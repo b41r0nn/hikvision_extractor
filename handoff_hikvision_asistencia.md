@@ -296,3 +296,12 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   - Resultado: **PASS**.
 - **SECRET_KEY:** `.env.example` ahora documenta que el valor debe generarse con `python -c "import secrets; print(secrets.token_urlsafe(32))"` y no copiarse literalmente. Se generó un ejemplo real y se pegó como ilustración (no se aplicó al `.env` real de producción; eso lo hace el usuario a mano).
 - **Pendiente confirmado por el usuario:** #4.1 (cambio real de `ADMIN_PASSWORD` en producción y reset contra PostgreSQL) queda fuera del alcance de este entorno.
+
+### 8.5 Lock de concurrencia en `_device_lock` (27 de julio de 2026)
+- **Objetivo:** confirmar que `extractor_hikvision._device_lock` serializa dos llamadas simultáneas al dispositivo.
+- **Test:** `test_evidencia/test_device_lock_concurrency_20260727_2026.py` + `test_evidencia/logs/test_device_lock_concurrency_20260727_145811.log`.
+  - Mock de `requests.post` para dormir 2s artificiales dentro del `fetch_range` real.
+  - Dos threads llamaron `fetch_range()` casi simultáneamente.
+  - Thread A entró al POST a las 14:58:12.583; thread B entró recién a las 14:58:14.584 (cuando A salió).
+  - Tiempo total: **4.01s** (dos llamadas de 2s secuenciales, sin solapamiento).
+  - Resultado: **PASS**. `_device_lock` funciona correctamente.
