@@ -146,7 +146,7 @@
 
 ## 3. Flujo end-to-end
 
-```
+```mermaid
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
 │  Biométrico     │────▶│  extractor_       │────▶│  PostgreSQL    │
 │  Hikvision      │ ISAPI│ hikvision.py     │     │  (registros)    │
@@ -257,7 +257,7 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 
 ### Post-deploy
 
-6. **Correo automático**: configurar cuenta Gmail y probar `enviar_correo_prueba()` y reportes programados.
+1. **Correo automático**: configurar cuenta Gmail y probar `enviar_correo_prueba()` y reportes programados.
 2. **Validación visual del frontend**: abrir `http://localhost:3000` en navegador y confirmar que no hay errores de consola, que los KPIs se renderizan y que los filtros de reportes actualizan la UI.
 3. **Tests automáticos**: considerar tests para cálculo de tardanzas, generación de reportes y lógica de días laborales.
 4. **Registro manual de empleados**: cargar en la tabla `Empleado` los nombres reales del biométrico para que aparezcan en reportes y tardanzas automáticamente.
