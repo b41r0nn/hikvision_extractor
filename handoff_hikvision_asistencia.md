@@ -13,7 +13,7 @@
 ### 1.1 `hikvision_extractor/`
 
 | Archivo | Estado | Descripción |
-|---|---|---|
+| --- | --- | --- |
 | `extractor_hikvision.py` | ✅ Funcional | Extracción ISAPI con paginación AM/PM/Q1-Q4. Lee credenciales del biométrico desde `.env`. Probado contra dispositivo real. |
 | `backend/sync_empleados.py` | ✅ Funcional | Sincroniza `Empleado` desde `/ISAPI/AccessControl/UserInfo/Search` con upsert por `employeeNo`. Nunca elimina. |
 | `backend/main.py` | ✅ Funcional | API FastAPI con endpoints de KPIs, tardanzas, registros, empleados, turnos, festivos, reportes, correo, sincronización de empleados, auth y RBAC. `create_all` ejecuta en el `lifespan`. |
@@ -23,7 +23,7 @@
 | `backend/config_service.py` | ✅ Funcional | Configuración persistente: destinatarios de correo y periodicidad de reportes. |
 | `backend/database.py` | ✅ Funcional | Conexión PostgreSQL via `DATABASE_URL` en `.env`. |
 | `backend/report_service.py` | ✅ Funcional | Generación Excel dinámica, cálculo de tardanzas, turno default para empleados sin turno propio. |
-| `backend/email_service.py` | ✅ Funcional | Envío SMTP de reportes semanal/mensual. Lee destinatarios desde la base de datos (configurables en admin). SMTP sigue configurado en `.env`.
+| `backend/email_service.py` | ✅ Funcional | Envío SMTP de reportes semanal/mensual. Lee destinatarios desde la base de datos (configurables en admin). SMTP sigue configurado en `.env`. |
 | `backend/scheduler.py` | ✅ Funcional | APScheduler: sync empleados, extracción diaria, reporte semanal, reporte mensual. |
 | `frontend/index.html` | ✅ Funcional | UI con login, cambio obligatorio de contraseña, dashboard, reportes, administración, usuarios/roles. |
 | `frontend/app.js` | ✅ Funcional | Lógica del frontend, autenticación JWT, polling de extracción, RBAC, flujo de cambio de contraseña. |
@@ -45,11 +45,13 @@
 ## 2. Decisiones de negocio implementadas
 
 ### 2.1 Sábados y domingos NO son días laborales
+
 - `report_service.es_dia_laboral()` devuelve `d.weekday() < 5 and d not in festivos`, es decir, **lunes a viernes sin festivos**.
 - Tardanzas y reportes solo se calculan sobre días laborales.
 - Verificado con datos reales: período 20/07/2026 (lunes festivo) a 26/07/2026 (domingo) arrojó 4 días laborales (martes a viernes). Sábado y domingo quedan fuera del Excel.
 
 ### 2.2 Empleados se sincronizan automáticamente desde el biométrico
+
 - `backend/sync_empleados.py` consulta `/ISAPI/AccessControl/UserInfo/Search` (personas enroladas) con paginación adaptada al límite del dispositivo.
 - Upsert por `employeeNoString`: si existe, actualiza `nombre`; si es nuevo, lo crea con `activo=True`, `turno_id=None`, `departamento=None`.
 - **Nunca** se elimina un empleado automáticamente si desaparece del dispositivo; el admin lo desactiva manualmente.
@@ -57,33 +59,39 @@
 - Las marcas sin empleado asociado se siguen exponiendo en `/api/registros/sin-asociar` para revisión.
 
 ### 2.3 Turno individual por empleado
+
 - Cada empleado tiene su propia `hora_entrada` y `tolerancia_minutos` en la tabla `Empleado`.
 - Si no se configuran, se usa el turno default del `.env` (`DEFAULT_TURNO_ENTRADA`, `DEFAULT_TOLERANCIA_MINUTOS`).
 - El catálogo compartido de turnos ya no se usa en la UI; el admin configura hora y tolerancia directamente en la vista de empleados.
 
 ### 2.4 Empleados activos aparecen en el reporte
+
 - El reporte Excel incluye **todos los empleados `activo=True`**, independientemente de si tienen turno individual configurado.
 - Empleados inactivos quedan fuera del reporte.
 - Quienes no tengan marcas en el período muestran `SIN REGISTRO` día por día.
 
 ### 2.5 Marcas casi simultáneas se fusionan en el Excel
+
 - `report_service._fusionar_marcas_por_empleado_dia()` agrupa marcas del mismo empleado/día que caen dentro de `MARCA_FUSION_MINUTOS` desde la primera marca del grupo.
 - La ventana se configura en `.env` (default 2 minutos). Use `0` para desactivar la fusión.
 - El número dinámico de columnas "Marca N" se calcula **sobre los datos ya fusionados**, no sobre los registros crudos.
 - La base de datos (`RegistroAsistencia`) conserva todas las marcas originales sin modificar.
 
 ### 2.6 Festivos automáticos vía `holidays`
+
 - `report_service.init_festivos()` puebla la tabla `Festivo` con festivos colombianos al iniciar la app.
 - La librería `holidays` se encarga de festivos móviles trasladados por Ley Emiliani.
 - El panel de festivos es solo lectura; no hay administración manual.
 
 ### 2.7 Configuración de correo y periodicidad persistente
+
 - La tabla `Configuracion` almacena destinatarios de correo y la periodicidad de reportes (día/hora semanal, día/hora mensual).
 - El admin puede agregar/quitar destinatarios y cambiar la periodicidad desde la pestaña Correo.
 - Al guardar periodicidad, el backend llama `scheduler.reschedule_report_jobs()` para reprogramar los jobs de APScheduler en caliente (sin reiniciar).
 - Los reportes automáticos usan los destinatarios de la base de datos; las credenciales SMTP siguen en `.env`.
 
 ### 2.8 Autenticación JWT y RBAC escalable
+
 - Tablas: `Rol`, `Permiso`, `RolPermiso`, `Usuario`.
 - Los roles y permisos se configuran desde el frontend (pestaña "Usuarios y roles"); no hay roles hardcodeados en el código.
 - Semilla inicial: rol `Admin` (todos los permisos) y rol `Reportes` (solo `ver_dashboard` y `generar_reportes`).
@@ -95,6 +103,7 @@
 - **Usuarios creados por el admin** también nacen con `requiere_cambio_password=True` (`backend/main.py:488-494`). Esto mantiene consistencia con los usuarios sembrados y evita que una contraseña temporal asignada por el admin quede viva indefinidamente.
 
 ### 2.9 Zona horaria del backend: America/Bogota
+
 - Se agregó `backend/timezone.py` con helpers `hoy_bogota()` y `ahora_bogota()` usando `ZoneInfo("America/Bogota")`.
 - Todos los lugares que usaban `date.today()` para determinar el "día de negocio" ahora usan `hoy_bogota()` (KPIs, tardanzas, extracción por defecto, reportes automáticos).
 - El `backend.Dockerfile` instala `tzdata`, define `ENV TZ=America/Bogota` y vincula `/etc/localtime` y `/etc/timezone`.
@@ -102,6 +111,7 @@
 - El frontend sigue usando `hoy()` con `timeZone: 'America/Bogota'`.
 
 ### 2.10 Backfill automático al arrancar el backend
+
 - Si el contenedor estuvo apagado y la última extracción exitosa (`ultima_extraccion_exitosa`) es anterior a `hoy_bogota()`, el `lifespan` dispara un hilo en background que extrae el rango `[última+1, hoy]`.
 - Usa `extractor_hikvision.main(start_str, end_str)`; el lock interno del extractor serializa las llamadas al dispositivo para evitar pisar otras extracciones.
 - Si nunca se registró una extracción exitosa (sistema nuevo), no se dispara nada automático; se espera la primera extracción manual o el job de las 8:00 PM.
@@ -109,12 +119,14 @@
 - El job programado a las 8:00 PM se mantiene sin cambios.
 
 ### 2.11 Alerta de extracción incompleta (`extraccion_incompleta_dias`)
+
 - Cuando el dispositivo reporta `totalMatches` para un día pero la extracción (incluso con el fallback AM/PM/Q1-Q4) devuelve menos eventos, `config_service.add_alerta_extraccion(db, fecha, esperado, obtenido)` persiste el gap en la clave `extraccion_incompleta_dias` de la tabla `Configuracion` (JSON).
 - Se mantiene solo los últimos 14 días (`ALERTAS_MAX_RECIENTES`); si ya existe una alerta para la fecha, solo se actualiza cuando el nuevo gap es mayor.
 - `/api/status` expone `alerta_extraccion_incompleta` (bool) y `extraccion_incompleta` (lista de `{fecha, esperado, obtenido, registrado_en}`). `alerta_retraso_extraccion` y `alerta_extraccion_incompleta` son independientes: una alerta de gap no se mezcla con la de "extracción atrasada > 26h".
 - Frontend: el banner `<div id="extraccion-incompleta-alerta">` (`frontend/index.html:208`) se renderiza desde `mostrarAvisoExtraccion()` (`frontend/app.js:224-277`) leyendo los dos campos de `/api/status`; cada fecha de la lista se muestra como una línea `Extracción del <f> puede estar incompleta (<obtenido> de <esperado> eventos)`.
 
 #### Evidencia de la verificación (27 de julio de 2026)
+
 - Procedimiento reproducible en `test_evidencia/test_alerta.py`.
 - Pasos ejecutados:
   1. `arrancar_alerta.bat` levanta uvicorn en `127.0.0.1:18002` con `DATABASE_URL=sqlite:///test_evidencia/evidencia.db`. El `lifespan` corrió Alembic, festivos, RBAC, config y detectó `ultima >= hoy`, por lo que **no se disparó backfill** (logs en `test_evidencia/logs/test_alerta_18002.log`).
@@ -162,7 +174,7 @@
 Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 
 | Métrica | Valor |
-|---|---|
+| --- | --- |
 | Total registros insertados | **121** |
 | Registros 2026-07-21 | 92 |
 | Registros 2026-07-22 | 29 |
@@ -173,11 +185,13 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 | Lógica AM/PM/Q1-Q4 | Activada ambos días |
 
 ### Observaciones de datos reales
+
 - Se detectaron marcas muy cercanas en el tiempo (ej. 08:00:43, 08:00:46, 08:00:47) para la misma persona. No son duplicados: son autenticaciones distintas. El Excel las muestra como `08:00` porque trunca a HH:MM.
 - Hay 36 nombres del biométrico que no coinciden con empleados registrados; aparecen en el panel "Marcas sin asociar".
 - Rango de horas reales: 05:46:51 a 19:34:33.
 
 ### Reporte Excel verificado
+
 - Encabezado azul oscuro `#1F3864` con texto blanco.
 - Celdas de hora con fondo verde claro `#E8F5E9`.
 - Columnas "Marca N" dinámicas (hasta 5 subcolumnas por día).
@@ -185,6 +199,7 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 - Encabezado con rango de fechas, empleados, días laborales, total marcaciones y días sin registro.
 
 ### Dashboard verificado (endpoints)
+
 - `/api/kpis` retorna KPIs coherentes.
 - `/api/tardanzas` calcula tardanzas con turno asignado o turno default.
 - `/api/registros/sin-asociar` lista 36 nombres sin empleado asociado.
@@ -192,6 +207,7 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 - Filtros de reporte por empleado, por selección múltiple y por departamento cambian el resultado.
 
 ### Pendiente de validación visual
+
 - No se pudo abrir el frontend en navegador gráfico porque el entorno de ejecución es solo línea de comandos. Los archivos estáticos (`index.html`, `app.js`) existen y son servidos por nginx en Docker.
 
 ---
@@ -226,11 +242,13 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 ## 7. Próximos pasos sugeridos
 
 ### Bloqueantes antes del deploy
+
 1. **Confirmar #4.1 con el usuario**: cambio real de `ADMIN_PASSWORD` en el `.env` de producción y reset contra la BD PostgreSQL real (no la SQLite de prueba).
 2. **Generar `SECRET_KEY` real** en el `.env` de producción: `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
 3. **Deploy**: el usuario corre `docker compose build --no-cache backend && docker compose up -d backend` y `docker compose up -d --force-recreate frontend`. El daemon de Docker no es accesible desde este entorno.
 
 ### Cerrados con evidencia en esta ronda
+
 - ✅ `misfire_grace_time=60` + test real de descarte.
 - ✅ Retomo del backfill desde el último día commiteado + `BACKFILL_TIMEOUT_SEC=3600`.
 - ✅ `create_usuario` fuerza `requiere_cambio_password=True`.
@@ -238,10 +256,11 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 - ✅ Buffer overflow / rangos grandes: cerrado por diseño (`main()` procesa día por día con `fetch_day()`).
 
 ### Post-deploy
+
 6. **Correo automático**: configurar cuenta Gmail y probar `enviar_correo_prueba()` y reportes programados.
-7. **Validación visual del frontend**: abrir `http://localhost:3000` en navegador y confirmar que no hay errores de consola, que los KPIs se renderizan y que los filtros de reportes actualizan la UI.
-8. **Tests automáticos**: considerar tests para cálculo de tardanzas, generación de reportes y lógica de días laborales.
-9. **Registro manual de empleados**: cargar en la tabla `Empleado` los nombres reales del biométrico para que aparezcan en reportes y tardanzas automáticamente.
+2. **Validación visual del frontend**: abrir `http://localhost:3000` en navegador y confirmar que no hay errores de consola, que los KPIs se renderizan y que los filtros de reportes actualizan la UI.
+3. **Tests automáticos**: considerar tests para cálculo de tardanzas, generación de reportes y lógica de días laborales.
+4. **Registro manual de empleados**: cargar en la tabla `Empleado` los nombres reales del biométrico para que aparezcan en reportes y tardanzas automáticamente.
 
 ---
 
@@ -252,7 +271,7 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 ### Checklist final
 
 | Ítem | Estado |
-|---|---|
+| --- | --- |
 | Sincronización de 71 empleados desde el biométrico | ✅ |
 | Turnos individuales por empleado | ✅ |
 | RBAC con roles/permisos no hardcodeados | ✅ |
@@ -265,16 +284,19 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 | Handoff actualizado | ✅ |
 
 ### Notas de cierre
+
 - No se pudo ejecutar el comando `python3 -c "from datetime import datetime; print(datetime.now())"` dentro del contenedor porque el daemon de Docker no está corriendo en este entorno. Sin embargo, el `backend.Dockerfile` ya instala `tzdata`, define `ENV TZ=America/Bogota` y vincula `/etc/localtime`, y el código usa `ZoneInfo("America/Bogota")` de forma explícita.
 - La validación visual del frontend en navegador gráfico queda como paso posterior, ya que este entorno es solo línea de comandos.
 - **Tag v0.0** apunta al checkpoint inicial funcional; **tag v1.0** apunta a la versión actual con backfill, Alembic, fix de paginación, alerta `extraccion_incompleta_dias` y banner del dashboard.
 
 ### 8.1 Verificaciones de la alerta (27 de julio de 2026)
+
 - `test_evidencia/test_alerta.py` y `test_evidencia/logs/test_alerta_resultado.txt` documentan el flujo completo (inserción → `/api/status` → banner).
 - `test_evidencia/arrancar_alerta.bat` levanta uvicorn en `:18002` con la BD de prueba.
 - uvicorn queda **detenido** al terminar cada corrida para no contaminar el puerto.
 
 ### 8.2 Fix y verificación de `misfire_grace_time` (27 de julio de 2026)
+
 - **Bug:** `misfire_grace_time=None` en los 4 jobs del scheduler (`sync_empleados_diaria`, `extraccion_diaria`, `reporte_semanal`, `reporte_mensual`). Según la documentación oficial de APScheduler, `None` significa grace time infinito (el job corre sin importar cuán tarde esté), lo opuesto a la intención original.
 - **Fix:** cambiado a `misfire_grace_time=60` en los 4 `add_job` (`backend/scheduler.py` líneas 68, 89, 112). El comentario explicativo fue corregido con la semántica real.
 - **Test real:** `test_evidencia/test_misfire_grace_20260727_2018.py` + `test_evidencia/logs/test_misfire_grace_20260727_144457.log`.
@@ -283,6 +305,7 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   - Resultado: **PASS**.
 
 ### 8.3 Verificación de retomo del backfill y ajuste de watchdog (27 de julio de 2026)
+
 - **Supuesto a validar:** si el watchdog mata el proceso a mitad de un backfill de varios días, el siguiente arranque retoma desde el último día commiteado, no desde el principio.
 - **Test:** `test_evidencia/test_backfill_resume_20260727_2026.py` + `test_evidencia/logs/test_backfill_resume_20260727_144954.log` + `test_evidencia/mock_backfill_uvicorn.py`.
   - Simuló un gap de 5 días (ultima = hoy − 5).
@@ -294,6 +317,7 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 - **Decisión:** se subió `BACKFILL_TIMEOUT_SEC` de `600` a `3600` en `.env.example` (1h cubre ~1 semana de gap con margen, dado ~80s/día). El watchdog sigue activo; no se deshabilita.
 
 ### 8.4 Fix de seguridad y documentación de SECRET_KEY (27 de julio de 2026)
+
 - **Fix:** `create_usuario` en `backend/main.py:488-494` ahora setea `requiere_cambio_password=True` para todo usuario nuevo creado por el admin.
 - **Evidencia:** `test_evidencia/test_create_user_password_change_20260727_2026.py` + `test_evidencia/logs/test_create_user_password_change_20260727_145205.log`.
   - `POST /api/usuarios` creó `testuser_145208` (rol Reportes).
@@ -303,6 +327,7 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 - **Pendiente confirmado por el usuario:** #4.1 (cambio real de `ADMIN_PASSWORD` en producción y reset contra PostgreSQL) queda fuera del alcance de este entorno.
 
 ### 8.5 Lock de concurrencia en `_device_lock` (27 de julio de 2026)
+
 - **Objetivo:** confirmar que `extractor_hikvision._device_lock` serializa dos llamadas simultáneas al dispositivo.
 - **Test:** `test_evidencia/test_device_lock_concurrency_20260727_2026.py` + `test_evidencia/logs/test_device_lock_concurrency_20260727_145811.log`.
   - Mock de `requests.post` para dormir 2s artificiales dentro del `fetch_range` real.
@@ -312,6 +337,7 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   - Resultado: **PASS**. `_device_lock` funciona correctamente.
 
 ### 8.6 Buffer overflow / rangos grandes de backfill (27 de julio de 2026)
+
 - **Estado:** Cerrado por diseño, sin prueba adicional.
 - **Razonamiento:** `extractor_hikvision.main()` itera día por día y llama `fetch_day()`, que a su vez llama `fetch_range()` con ventanas de 24h (con fallback AM/PM/Q1-Q4). Nunca carga el rango completo en memoria; el consumo de memoria por día está acotado por la paginación (`BATCH_SIZE=50`) y el lock `_device_lock` serializa las llamadas. El watchdog de 1h (`BACKFILL_TIMEOUT_SEC=3600`) cubre el gap práctico esperado (~1 semana); si se necesitara más, el backfill retoma desde el último día commiteado tras el reinicio del contenedor.
 
@@ -320,7 +346,7 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 ## 9. Problemas actuales / bloqueantes abiertos
 
 | # | Problema | Impacto | Owner | Estado |
-|---|---|---|---|---|
+| --- | --- | --- | --- | --- |
 | 1 | `ADMIN_PASSWORD` del `.env` de producción aún no se ha cambiado ni reseteado en PostgreSQL real | Riesgo de acceso con credencial por defecto | Usuario | Pendiente (#4.1) |
 | 2 | `SECRET_KEY` de producción no generado | Tokens JWT firmados con valor de ejemplo/documentación | Usuario | Pendiente |
 | 3 | Deploy a producción no realizado | Sistema aún no corre en Docker real | Usuario | Pendiente |
@@ -330,6 +356,7 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 | 7 | Buffer overflow en backfill de rangos grandes | **Mitigado por diseño**: procesamiento día por día con `fetch_day()` + `BATCH_SIZE=50` + `_device_lock` + watchdog 1h | Cerrado | No requiere acción |
 
 ### Notas
+
 - Los ítems 1, 2 y 3 son **bloqueantes antes del deploy**.
 - Los ítems 4, 5 y 6 son **post-deploy**; no impiden que el sistema funcione, pero limitan funcionalidad.
 - El ítem 7 queda documentado como cerrado por diseño; no se hará prueba adicional.
