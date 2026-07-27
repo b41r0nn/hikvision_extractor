@@ -537,11 +537,84 @@ docker compose logs -f db
 docker compose logs -f frontend
 ```
 
-### 10.5 Acceder a la base de datos
+### 10.5 Conectarse a la base de datos
+
+Las credenciales están en el `.env`:
+
+```env
+POSTGRES_USER=admin
+POSTGRES_PASSWORD=adminpassword
+POSTGRES_DB=hikvision
+```
+
+#### Opción A: Desde el contenedor Docker (recomendada)
 
 ```bash
 docker compose exec db psql -U admin -d hikvision
 ```
+
+Dentro de `psql` podés ejecutar consultas como:
+
+```sql
+-- Listar tablas
+\dt
+
+-- Ver empleados activos
+SELECT * FROM empleados WHERE activo = true ORDER BY nombre;
+
+-- Ver últimas marcaciones
+SELECT * FROM registros_asistencia ORDER BY fecha DESC, hora DESC LIMIT 20;
+
+-- Ver usuarios del panel
+SELECT username, activo, requiere_cambio_password FROM usuarios;
+
+-- Salir
+\q
+```
+
+#### Opción B: Desde un cliente gráfico
+
+| Campo | Valor |
+| --- | --- |
+| Host | `localhost` (o la IP del servidor en producción) |
+| Puerto | `5432` |
+| Base de datos | `hikvision` |
+| Usuario | `admin` |
+| Contraseña | valor de `POSTGRES_PASSWORD` en `.env` |
+
+Clientes soportados: DBeaver, pgAdmin, DataGrip, TablePlus, etc.
+
+#### Opción C: Desde PowerShell con `psql` instalado
+
+```powershell
+psql -h localhost -p 5432 -U admin -d hikvision
+```
+
+#### Opción D: Desde Python
+
+```python
+from sqlalchemy import create_engine, text
+
+DATABASE_URL = "postgresql://admin:adminpassword@localhost:5432/hikvision"
+engine = create_engine(DATABASE_URL)
+
+with engine.connect() as conn:
+    result = conn.execute(text("SELECT * FROM empleados LIMIT 5"))
+    for row in result:
+        print(row)
+```
+
+#### Opción E: En producción (servidor remoto)
+
+Si la base de datos está en un servidor remoto, conectate usando la IP del
+servidor y asegurate de que el puerto `5432` esté accesible o de usar un túnel
+SSH:
+
+```powershell
+ssh -L 5432:localhost:5432 usuario@ip-servidor
+```
+
+Luego conectate como si fuera `localhost`.
 
 ### 10.6 Ejecutar migraciones manualmente
 
