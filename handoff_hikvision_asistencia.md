@@ -353,7 +353,7 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 **Decisión de arquitectura:** se elimina el fallback a `DEFAULT_TURNO_ENTRADA`/`DEFAULT_TOLERANCIA_MINUTOS` del `.env`. Todo empleado debe tener un `turno_id` real. Cada turno tiene horarios versionados por día de semana en `turno_horario`.
 
 **Cambios implementados:**
-- Migración Alembic `25e5f322addf_add_turno_horario`: nueva tabla `turno_horario` con índice único `(turno_id, dia_semana, vigente_desde)` y `ON DELETE CASCADE`.
+- Migración Alembic `25e5f322addf_add_turno_horario`: nueva tabla `turno_horario` con índice único `(turno_id, dia_semana, vigente_desde)` y `ON DELETE CASCADE`. `server_default` usa `CURRENT_TIMESTAMP` para compatibilidad SQLite/PostgreSQL.
 - Modelo `TurnoHorario` en `backend/models.py`.
 - Función `obtener_horario_vigente()` en `backend/report_service.py`.
 - `calcular_tardanzas_dia()` lee el horario vigente del `turno_id` del empleado para el día de la semana y fecha. Si no hay turno u horario, lanza `HorarioNoConfiguradoError`.
@@ -375,10 +375,45 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   - Turno sin horario para lunes → `HorarioNoConfiguradoError`.
   - Resultado: **PASS**.
 
-**Fase B bloqueada** hasta tener:
-1. Resultado real de las queries contra producción (empleados sin `turno_id`, tabla `empleados` vs `empleado`).
-2. Fecha real de vigencia del horario nuevo de lunes.
-3. Confirmación de `pg_dump` reciente + autorización del arquitecto.
+### 8.8 Fase B — Migración de datos "Turno General" (28 de julio de 2026)
+
+**Datos confirmados por el arquitecto:**
+- 71 empleados con `turno_id IS NULL` en tabla `empleados`.
+- Backup: `backup_pre_horario_lunes_20260728_0832.sql`.
+- `vigente_desde = 2026-07-28`.
+- Tolerancia nueva: 1 minuto para todos los días.
+- Lunes nuevo: hora entrada 08:00.
+- Martes a viernes: 07:30.
+- Valores históricos base: 07:30 con tolerancia 10.
+
+**Script:** `test_evidencia/migracion_turno_general.py`
+
+**Pasos del script (todo dentro de una transacción):**
+1. INSERT INTO `turnos` ('Turno General') → `turno_id`.
+2. INSERT 5 filas base en `turno_horario` (`vigente_desde=2020-01-01`, 07:30, tol 10).
+3. INSERT 5 filas nuevas (`vigente_desde=2026-07-28`): lunes 08:00/1, martes-viernes 07:30/1.
+4. UPDATE `empleados` SET `turno_id` = nuevo_id WHERE `turno_id IS NULL`.
+5. Verificación antes de COMMIT:
+   - `count(*) FROM empleados WHERE turno_id IS NULL` = 0.
+   - `count(*) FROM turno_horario WHERE turno_id = <id>` = 10.
+   - `obtener_horario_vigente(id, 0, 2026-07-28)` = (08:00, 1).
+   - `obtener_horario_vigente(id, 1, 2026-07-28)` = (07:30, 1).
+   - `obtener_horario_vigente(id, 0, 2020-06-01)` = (07:30, 10).
+   Si falla → ROLLBACK.
+
+**Evidencia contra BD de prueba (SQLite, simulando backup):**
+- `test_evidencia/preparar_bd_prueba_migracion.py` crea `test_evidencia/migracion_prueba.db` con 71 empleados y schema actual.
+- `test_evidencia/logs/migracion_turno_general_console.txt`:
+  - `Empleados con turno_id IS NULL antes del UPDATE: 71`
+  - `CHECK 1: empleados con turno_id IS NULL = 0`
+  - `CHECK 2: filas turno_horario para turno_id=1 = 10`
+  - `CHECK 3: lunes 2026-07-28 -> hora=08:00:00 tolerancia=1`
+  - `CHECK 4: martes 2026-07-28 -> hora=07:30:00 tolerancia=1`
+  - `CHECK 5: lunes 2020-06-01 -> hora=07:30:00 tolerancia=10`
+  - `COMMIT exitoso`
+  - Resultado: **PASS**.
+
+**Pendiente:** ejecución contra la BD PostgreSQL real. No se puede completar desde este entorno porque Docker Desktop no está corriendo y no hay cliente PostgreSQL instalado localmente.
 
 ## 9. Problemas actuales / bloqueantes abiertos
 
