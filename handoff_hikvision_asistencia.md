@@ -413,7 +413,41 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   - `COMMIT exitoso`
   - Resultado: **PASS**.
 
-**Pendiente:** ejecución contra la BD PostgreSQL real. No se puede completar desde este entorno porque Docker Desktop no está corriendo y no hay cliente PostgreSQL instalado localmente.
+**Pendiente:** ejecución contra la BD PostgreSQL real. No se puede completar desde este entorno porque Docker Desktop no está corriendo, no hay PostgreSQL en `localhost:5432` y no hay cliente PostgreSQL instalado localmente.
+
+**Backup movido fuera del repo** por seguridad:
+`C:\Users\Sistemas\AppData\Local\Temp\opencode\backups\backup_pre_horario_lunes_20260728_0832.sql`
+
+**Comandos para ejecutar en el servidor una vez levantado Docker:**
+
+```bash
+# 0. Confirmar versión de schema en BD real
+docker compose exec db psql -U admin -d hikvision -c "SELECT * FROM alembic_version;"
+
+# Si NO es 25e5f322addf, aplicar schema primero
+export DATABASE_URL="postgresql://admin:adminpassword@localhost:5432/hikvision"
+.venv/Scripts/python.exe -m alembic upgrade head
+
+# Verificar que turno_horario existe
+docker compose exec db psql -U admin -d hikvision -c "\dt"
+
+# Correr migración de datos desde el host
+export DATABASE_URL="postgresql://admin:adminpassword@localhost:5432/hikvision"
+.venv/Scripts/python.exe test_evidencia/migracion_turno_general.py
+
+# Post-migración
+docker compose exec db psql -U admin -d hikvision -c "SELECT count(*) FROM empleados WHERE turno_id IS NULL;"
+docker compose exec db psql -U admin -d hikvision -c "SELECT count(*) FROM turno_horario;"
+```
+
+Esperado post-migración: `0` y `10`.
+
+**Recién con post-migración 0/10, deploy autorizado:**
+
+```bash
+docker compose build --no-cache backend
+docker compose up -d --force-recreate backend frontend
+```
 
 ## 9. Problemas actuales / bloqueantes abiertos
 
