@@ -404,6 +404,7 @@
         <!-- Tabs -->
         <div class="border-b border-slate-700">
             <button class="tab-btn active" onclick="showTab('empleados')">Empleados</button>
+            <button class="tab-btn"        onclick="showTab('turnos')">Turnos</button>
             <button class="tab-btn"        onclick="showTab('festivos')">Festivos</button>
             <button class="tab-btn"        onclick="showTab('correo')">Correo</button>
             <button class="tab-btn"        onclick="showTab('roles')">Usuarios y roles</button>
@@ -415,7 +416,7 @@
                 <div class="flex items-center justify-between flex-wrap gap-3">
                     <div>
                         <h3 class="text-sm font-semibold text-slate-300">Empleados sincronizados</h3>
-                        <p class="text-xs text-slate-400">Los empleados se obtienen automáticamente desde el biométrico. Edita departamento, hora de entrada y tolerancia por empleado.</p>
+                        <p class="text-xs text-slate-400">Los empleados se obtienen automáticamente desde el biométrico. Edita departamento y asigna un turno (el horario se lee desde la versión vigente del turno).</p>
                     </div>
                     <div class="flex items-center gap-3">
                         <span id="sync-status" class="text-xs text-slate-400 font-mono">Inactivo</span>
@@ -433,11 +434,10 @@
                         <th>Nombre</th>
                         <th>Activo</th>
                         <th>Departamento</th>
-                        <th>Hora entrada</th>
-                        <th>Tolerancia (min)</th>
+                        <th>Turno</th>
                         <th></th>
                     </tr></thead>
-                    <tbody id="tabla-empleados"><tr><td colspan="7" class="text-center py-6 text-slate-500 text-xs">Cargando...</td></tr></tbody>
+                    <tbody id="tabla-empleados"><tr><td colspan="6" class="text-center py-6 text-slate-500 text-xs">Cargando...</td></tr></tbody>
                 </table>
             </div>
 
@@ -454,6 +454,86 @@
                         <tbody id="tabla-sin-asociar"><tr><td colspan="2" class="text-center py-4 text-slate-500 text-xs">Cargando...</td></tr></tbody>
                     </table>
                 </div>
+            </div>
+        </div>
+
+        <!-- TAB: Turnos -->
+        <div id="tab-turnos" class="tab-content space-y-4">
+            <div class="glass p-4 space-y-3">
+                <div class="flex items-center justify-between flex-wrap gap-3">
+                    <div>
+                        <h3 class="text-sm font-semibold text-slate-300">Turnos</h3>
+                        <p class="text-xs text-slate-400">Cada turno tiene 5 horarios versionados (lunes a viernes). Al guardar un cambio se crea una nueva vigencia; el historial se conserva.</p>
+                    </div>
+                    <button onclick="mostrarFormTurno()" class="btn-primary text-xs px-3 py-2">+ Nuevo turno</button>
+                </div>
+            </div>
+
+            <!-- Formulario nuevo/editar turno -->
+            <div id="form-turno" class="glass p-4 space-y-4 hidden">
+                <h4 id="titulo-form-turno" class="text-sm font-semibold text-slate-300">Nuevo turno</h4>
+                <input type="hidden" id="turno-id">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label text-xs">Nombre del turno</label>
+                        <input type="text" id="turno-nombre" class="form-input text-xs" placeholder="Ej. Turno Administrativo">
+                    </div>
+                    <div>
+                        <label class="form-label text-xs">Hora de salida (referencia)</label>
+                        <input type="time" id="turno-salida" class="form-input text-xs">
+                    </div>
+                </div>
+
+                <div id="turno-horarios-grid" class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                    <!-- Se llena desde JS -->
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="guardarTurno()" class="btn-success text-xs px-4 py-2">Guardar turno</button>
+                    <button onclick="cancelarFormTurno()" class="btn-secondary text-xs px-4 py-2">Cancelar</button>
+                </div>
+            </div>
+
+            <!-- Formulario nueva vigencia de un día -->
+            <div id="form-vigencia" class="glass p-4 space-y-4 hidden">
+                <h4 class="text-sm font-semibold text-slate-300">Nueva vigencia de horario</h4>
+                <input type="hidden" id="vigencia-turno-id">
+                <input type="hidden" id="vigencia-dia-semana">
+                <p class="text-xs text-slate-400">Día: <span id="vigencia-dia-nombre" class="text-white font-medium"></span></p>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                        <label class="form-label text-xs">Hora de entrada</label>
+                        <input type="time" id="vigencia-hora" class="form-input text-xs">
+                    </div>
+                    <div>
+                        <label class="form-label text-xs">Tolerancia (min)</label>
+                        <input type="number" id="vigencia-tolerancia" class="form-input text-xs" min="0">
+                    </div>
+                    <div>
+                        <label class="form-label text-xs">Vigente desde</label>
+                        <input type="date" id="vigencia-desde" class="form-input text-xs">
+                    </div>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="guardarVigencia()" class="btn-success text-xs px-4 py-2">Guardar vigencia</button>
+                    <button onclick="cancelarFormVigencia()" class="btn-secondary text-xs px-4 py-2">Cancelar</button>
+                </div>
+            </div>
+
+            <!-- Lista de turnos -->
+            <div class="glass overflow-hidden">
+                <table class="data-table">
+                    <thead><tr>
+                        <th>Turno</th>
+                        <th>Lunes</th>
+                        <th>Martes</th>
+                        <th>Miércoles</th>
+                        <th>Jueves</th>
+                        <th>Viernes</th>
+                        <th></th>
+                    </tr></thead>
+                    <tbody id="tabla-turnos"><tr><td colspan="7" class="text-center py-6 text-slate-500 text-xs">Cargando...</td></tr></tbody>
+                </table>
             </div>
         </div>
 

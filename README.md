@@ -167,7 +167,13 @@ Define las clases mapeadas a tablas. Cada modelo hereda de `Base` declarative.
 Destacados:
 
 - `Empleado`: `employee_id`, `nombre`, `departamento`, `activo`,
-  `hora_entrada` y `tolerancia_minutos` (turno individual).
+  `turno_id` ( FK a `turnos`). Las columnas `hora_entrada` y
+  `tolerancia_minutos` quedan deprecadas en Fase A.
+- `Turno`: nombre del turno. Su horario real vive en `turno_horario`.
+- `TurnoHorario`: horario versionado por día de semana (`dia_semana`
+  0=lunes...4=viernes) y fecha de vigencia (`vigente_desde`). Permite
+  cambiar el horario de un día a partir de una fecha sin perder el
+  historial.
 - `RegistroAsistencia`: guarda `evento_raw` (timestamp ISO original del
   dispositivo) para auditoría.
 - `Usuario`: `password_hash`, `rol_id`, `activo`, `requiere_cambio_password`.
@@ -240,8 +246,12 @@ Abstrae la tabla `Configuracion` como clave-valor:
   - `entrada_salida`: dos columnas por día (Entrada / Salida).
   - `completo`: columnas dinámicas `Marca 1`, `Marca 2`, ... según la máxima
     cantidad de marcas de un día.
+- `obtener_horario_vigente`: consulta `turno_horario` para devolver el horario
+  vigente de un turno, día de semana y fecha. Lanza
+  `HorarioNoConfiguradoError` si no existe.
 - `calcular_tardanzas_dia`: compara la primera marca del día con la hora de
-  entrada del empleado + tolerancia. Usa turno individual o default del `.env`.
+  entrada vigente del turno + tolerancia. No usa variables de `.env` ni
+  horarios individuales deprecados.
 
 ### 4.10 `backend/sync_empleados.py` — Sincronización de empleados
 
@@ -327,9 +337,12 @@ Puede ejecutarse como script independiente o ser llamado desde el backend.
 
 - Para un día laboral, `calcular_tardanzas_dia` obtiene la primera marca de
   cada empleado.
-- Compara la marca con la hora de entrada del empleado (individual o default)
-  más la tolerancia.
+- Obtiene el horario vigente del turno asignado al empleado para ese día de
+  la semana y fecha mediante `obtener_horario_vigente`.
+- Compara la marca con la hora de entrada vigente más la tolerancia.
 - Si la marca es posterior al límite, se reporta la tardanza en minutos.
+- Si el empleado no tiene turno_id o el turno no tiene horario configurado,
+  lanza `HorarioNoConfiguradoError` (falla ruidosa).
 
 ### 5.6 Reportes Excel
 
@@ -446,8 +459,8 @@ Copiar `.env.example` a `.env` y completar los valores reales.
 | `SMTP_USER` | `tu_correo@gmail.com` | Cuenta de correo. |
 | `SMTP_APP_PASSWORD` | `xxxxxxxxxxxxxxxx` | Contraseña de aplicación de 16 caracteres. |
 | `REPORT_RECIPIENTS` | `rrhh@redihos.com` | Destinatarios iniciales de reportes automáticos. |
-| `DEFAULT_TURNO_ENTRADA` | `07:30` | Hora de entrada por defecto. |
-| `DEFAULT_TOLERANCIA_MINUTOS` | `10` | Minutos de tolerancia por defecto. |
+| `DEFAULT_TURNO_ENTRADA` | `07:30` | **DEPRECADO** en Fase A. Ya no se usa; todo empleado debe tener turno_id real. |
+| `DEFAULT_TOLERANCIA_MINUTOS` | `10` | **DEPRECADO** en Fase A. Ya no se usa; el horario se lee desde `turno_horario`. |
 | `MARCA_FUSION_MINUTOS` | `2` | Ventana para fusionar marcas en el Excel. |
 | `SECRET_KEY` | `...` | Clave para firmar JWT. Generar en producción. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `480` | Duración del token en minutos. |

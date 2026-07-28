@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from . import models
 from .database import engine, get_db, SessionLocal
 from .scheduler import start_scheduler
-from .report_service import generar_reporte, calcular_tardanzas_dia, get_festivos, es_dia_laboral, init_festivos
+from .report_service import generar_reporte, calcular_tardanzas_dia, get_festivos, es_dia_laboral, init_festivos, obtener_horario_vigente, HorarioNoConfiguradoError
 from .email_service import enviar_correo_prueba
 from .sync_empleados import sync_empleados
 from .auth import (
@@ -246,16 +246,36 @@ class ExtraerRequest(BaseModel):
     fecha_inicio: Optional[str] = None
     fecha_fin:    Optional[str] = None
 
+class TurnoHorarioItem(BaseModel):
+    dia_semana:         int       # 0=lunes, 1=martes, 2=miércoles, 3=jueves, 4=viernes
+    hora_entrada:       str       # "HH:MM"
+    tolerancia_minutos: int = 10
+
+
 class TurnoCreate(BaseModel):
     nombre:             str
-    hora_entrada:       str      # "HH:MM"
     hora_salida:        Optional[str] = None
-    tolerancia_minutos: int = 10
+    # Al crear un turno se deben proveer los 5 horarios iniciales (lunes a viernes).
+    horarios:           List[TurnoHorarioItem]
+
+
+class TurnoUpdate(BaseModel):
+    nombre:             str
+    hora_salida:        Optional[str] = None
+
+
+class TurnoHorarioCreate(BaseModel):
+    dia_semana:         int
+    hora_entrada:       str       # "HH:MM"
+    tolerancia_minutos: int
+    vigente_desde:      Optional[str] = None  # "YYYY-MM-DD"; default hoy_bogota()
+
 
 class EmpleadoUpdate(BaseModel):
     departamento:       Optional[str] = None
-    hora_entrada:       Optional[str] = None      # "HH:MM"
-    tolerancia_minutos: Optional[int] = None
+    turno_id:           Optional[int] = None
+    # hora_entrada y tolerancia_minutos individuales quedan deprecados en Fase A.
+    # La fuente de verdad es turno_horario a través del turno_id del empleado.
     activo:             bool = True
 
 
@@ -705,7 +725,21 @@ def get_empleados(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(require_perm("ver_dashboard")),
 ):
-    return db.query(models.Empleado).order_by(models.Empleado.nombre).all()
+    empleados = db.query(models.Empleado).order_by(models.Empleado.nombre).all()
+    return [
+        {
+            "id": e.id,
+            "employee_id": e.employee_id,
+            "nombre": e.nombre,
+            "departamento": e.departamento,
+            "turno_id": e.turno_id,
+            "activo": e.activo,
+            # Columnas individuales deprecadas; se mantienen por compatibilidad.
+            "hora_entrada": e.hora_entrada.strftime("%H:%M") if e.hora_entrada else None,
+            "tolerancia_minutos": e.tolerancia_minutos,
+        }
+        for e in empleados
+    ]
 
 @app.get("/api/empleados/departamentos")
 def get_departamentos(
@@ -726,18 +760,15 @@ def update_empleado(
     if not obj:
         raise HTTPException(status_code=404, detail="Empleado no encontrado.")
 
-    obj.departamento       = emp.departamento
-    obj.activo             = emp.activo
-    obj.tolerancia_minutos = emp.tolerancia_minutos
-
-    if emp.hora_entrada:
-        try:
-            h, m = emp.hora_entrada.split(":")
-            obj.hora_entrada = time(int(h), int(m))
-        except ValueError:
-            raise HTTPException(status_code=400, detail="hora_entrada debe tener formato HH:MM.")
+    obj.departamento = emp.departamento
+    obj.activo       = emp.activo
+    if emp.turno_id is not None:
+        turno = db.query(models.Turno).filter(models.Turno.id == emp.turno_id).first()
+        if not turno:
+            raise HTTPException(status_code=400, detail="Turno no encontrado.")
+        obj.turno_id = emp.turno_id
     else:
-        obj.hora_entrada = None
+        obj.turno_id = None
 
     db.commit()
     db.refresh(obj)
@@ -757,14 +788,53 @@ def delete_empleado(
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-#  TURNOS (legacy: ya no se usan en la UI, protegidos por admin_empleados)
+#  TURNOS (versionado por día de semana desde Fase A)
 # ══════════════════════════════════════════════════════════════════════════════
+
+def _str_to_time(value: Optional[str]) -> Optional[time]:
+    if not value:
+        return None
+    try:
+        h, m = value.split(":")
+        return time(int(h), int(m))
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de hora debe ser HH:MM")
+
+
+def _horario_vigente_hoy_json(db: Session, turno_id: int) -> List[Optional[dict]]:
+    """Devuelve los 5 horarios vigentes de hoy (lunes=0 ... viernes=4) para un turno."""
+    hoy = hoy_bogota()
+    result = []
+    for dia in range(5):
+        try:
+            he, tol = obtener_horario_vigente(db, turno_id, dia, hoy)
+            result.append({
+                "hora_entrada": he.strftime("%H:%M"),
+                "tolerancia_minutos": tol,
+                "vigente_desde": None,
+            })
+        except HorarioNoConfiguradoError:
+            result.append(None)
+    return result
+
+
 @app.get("/api/turnos")
 def get_turnos(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(require_perm("admin_empleados")),
 ):
-    return db.query(models.Turno).all()
+    """Lista de turnos con el horario vigente de hoy para cada día de semana."""
+    turnos = db.query(models.Turno).order_by(models.Turno.nombre).all()
+    return [
+        {
+            "id": t.id,
+            "nombre": t.nombre,
+            "hora_salida": t.hora_salida.strftime("%H:%M") if t.hora_salida else None,
+            "horarios_hoy": _horario_vigente_hoy_json(db, t.id),
+        }
+        for t in turnos
+    ]
+
 
 @app.post("/api/turnos", status_code=201)
 def create_turno(
@@ -772,36 +842,142 @@ def create_turno(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(require_perm("admin_empleados")),
 ):
-    h_entrada = time(*[int(x) for x in t.hora_entrada.split(":")])
-    h_salida  = time(*[int(x) for x in t.hora_salida.split(":")]) if t.hora_salida else None
+    """Crea un turno y sus 5 horarios iniciales vigentes desde hoy."""
+    if len(t.horarios) != 5:
+        raise HTTPException(status_code=400, detail="Se requieren exactamente 5 horarios (lunes a viernes)")
+    dias = {h.dia_semana for h in t.horarios}
+    if dias != set(range(5)):
+        raise HTTPException(status_code=400, detail="Los horarios deben cubrir los días 0 al 4 (lunes a viernes)")
+
+    h_salida = _str_to_time(t.hora_salida)
+    # Mantenemos las columnas deprecadas por compatibilidad (no se leen).
+    hoy = hoy_bogota()
+    horario_lunes = next((h for h in t.horarios if h.dia_semana == 0), None)
     nuevo = models.Turno(
         nombre=t.nombre,
-        hora_entrada=h_entrada,
         hora_salida=h_salida,
-        tolerancia_minutos=t.tolerancia_minutos
+        hora_entrada=_str_to_time(horario_lunes.hora_entrada) if horario_lunes else None,
+        tolerancia_minutos=horario_lunes.tolerancia_minutos if horario_lunes else 10,
     )
     db.add(nuevo)
     db.commit()
     db.refresh(nuevo)
-    return nuevo
+
+    for h in t.horarios:
+        db.add(
+            models.TurnoHorario(
+                turno_id=nuevo.id,
+                dia_semana=h.dia_semana,
+                hora_entrada=_str_to_time(h.hora_entrada),
+                tolerancia_minutos=h.tolerancia_minutos,
+                vigente_desde=hoy,
+            )
+        )
+    db.commit()
+    db.refresh(nuevo)
+    return {
+        "id": nuevo.id,
+        "nombre": nuevo.nombre,
+        "hora_salida": nuevo.hora_salida.strftime("%H:%M") if nuevo.hora_salida else None,
+        "horarios_hoy": _horario_vigente_hoy_json(db, nuevo.id),
+    }
+
+
+@app.get("/api/turnos/{turno_id}")
+def get_turno(
+    turno_id: int,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(require_perm("admin_empleados")),
+):
+    """Detalle de un turno con su historial de horarios."""
+    obj = db.query(models.Turno).filter(models.Turno.id == turno_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Turno no encontrado.")
+    horarios = (
+        db.query(models.TurnoHorario)
+        .filter(models.TurnoHorario.turno_id == turno_id)
+        .order_by(models.TurnoHorario.dia_semana, models.TurnoHorario.vigente_desde.desc())
+        .all()
+    )
+    return {
+        "id": obj.id,
+        "nombre": obj.nombre,
+        "hora_salida": obj.hora_salida.strftime("%H:%M") if obj.hora_salida else None,
+        "horarios_hoy": _horario_vigente_hoy_json(db, turno_id),
+        "horarios": [
+            {
+                "id": h.id,
+                "dia_semana": h.dia_semana,
+                "hora_entrada": h.hora_entrada.strftime("%H:%M"),
+                "tolerancia_minutos": h.tolerancia_minutos,
+                "vigente_desde": h.vigente_desde.isoformat(),
+                "created_at": h.created_at.isoformat() if h.created_at else None,
+            }
+            for h in horarios
+        ],
+    }
+
 
 @app.put("/api/turnos/{turno_id}")
 def update_turno(
     turno_id: int,
-    t: TurnoCreate,
+    t: TurnoUpdate,
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(require_perm("admin_empleados")),
 ):
+    """Actualiza nombre y hora de salida de un turno (no sus horarios)."""
     obj = db.query(models.Turno).filter(models.Turno.id == turno_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Turno no encontrado.")
-    obj.nombre             = t.nombre
-    obj.hora_entrada       = time(*[int(x) for x in t.hora_entrada.split(":")])
-    obj.hora_salida        = time(*[int(x) for x in t.hora_salida.split(":")]) if t.hora_salida else None
-    obj.tolerancia_minutos = t.tolerancia_minutos
+    obj.nombre = t.nombre
+    obj.hora_salida = _str_to_time(t.hora_salida)
     db.commit()
     db.refresh(obj)
-    return obj
+    return {
+        "id": obj.id,
+        "nombre": obj.nombre,
+        "hora_salida": obj.hora_salida.strftime("%H:%M") if obj.hora_salida else None,
+        "horarios_hoy": _horario_vigente_hoy_json(db, turno_id),
+    }
+
+
+@app.post("/api/turnos/{turno_id}/horarios", status_code=201)
+def add_turno_horario(
+    turno_id: int,
+    h: TurnoHorarioCreate,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(require_perm("admin_empleados")),
+):
+    """Inserta una nueva vigencia de horario para un día de la semana.
+
+    Nunca actualiza una fila existente; siempre inserta una nueva vigencia.
+    """
+    turno = db.query(models.Turno).filter(models.Turno.id == turno_id).first()
+    if not turno:
+        raise HTTPException(status_code=404, detail="Turno no encontrado.")
+    if not (0 <= h.dia_semana <= 4):
+        raise HTTPException(status_code=400, detail="dia_semana debe estar entre 0 (lunes) y 4 (viernes)")
+
+    vigente_desde = date.fromisoformat(h.vigente_desde) if h.vigente_desde else hoy_bogota()
+    nuevo_horario = models.TurnoHorario(
+        turno_id=turno_id,
+        dia_semana=h.dia_semana,
+        hora_entrada=_str_to_time(h.hora_entrada),
+        tolerancia_minutos=h.tolerancia_minutos,
+        vigente_desde=vigente_desde,
+    )
+    db.add(nuevo_horario)
+    db.commit()
+    db.refresh(nuevo_horario)
+    return {
+        "id": nuevo_horario.id,
+        "turno_id": nuevo_horario.turno_id,
+        "dia_semana": nuevo_horario.dia_semana,
+        "hora_entrada": nuevo_horario.hora_entrada.strftime("%H:%M"),
+        "tolerancia_minutos": nuevo_horario.tolerancia_minutos,
+        "vigente_desde": nuevo_horario.vigente_desde.isoformat(),
+    }
+
 
 @app.delete("/api/turnos/{turno_id}", status_code=204)
 def delete_turno(

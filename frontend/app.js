@@ -203,14 +203,16 @@ function showView(name) {
 }
 
 function showTab(name) {
-    const tabs = ['empleados','festivos','correo','roles'];
+    const tabs = ['empleados','turnos','festivos','correo','roles'];
     document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        if (i >= tabs.length) return;
         b.classList.toggle('active', tabs[i] === name);
         document.getElementById(`tab-${tabs[i]}`).classList.toggle('active', tabs[i] === name);
     });
     if (name === 'festivos')  cargarFestivos();
     if (name === 'correo')    cargarConfigCorreo();
     if (name === 'empleados') cargarEmpleadosAdmin();
+    if (name === 'turnos')    cargarTurnos();
     if (name === 'roles')     cargarUsuariosRoles();
 }
 
@@ -517,10 +519,18 @@ async function generarReporte() {
 
 // ── Admin: Empleados ────────────────────────────────────────────────────────
 async function cargarAdmin() {
+    await cargarTurnos();
     await cargarEmpleadosAdmin();
 }
 
 let adminEmpleados = [];
+let adminTurnos = [];
+
+function opcionesTurno(selectedId) {
+    return adminTurnos.map(t =>
+        `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.nombre}</option>`
+    ).join('');
+}
 
 async function cargarEmpleadosAdmin() {
     if (!tienePermiso('admin_empleados') && !tienePermiso('sync_empleados')) return;
@@ -532,12 +542,11 @@ async function cargarEmpleadosAdmin() {
 
         const tbody = document.getElementById('tabla-empleados');
         if (!emps.length) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-500 text-xs">No hay empleados sincronizados. Usa el botón de arriba.</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-6 text-slate-500 text-xs">No hay empleados sincronizados. Usa el botón de arriba.</td></tr>';
             return;
         }
 
         tbody.innerHTML = emps.map(e => {
-            const he = e.hora_entrada ? e.hora_entrada.slice(0,5) : '';
             return `
             <tr id="emp-row-${e.id}" class="${e.activo ? '' : 'opacity-50'}">
                 <td class="font-mono text-xs text-slate-400">${e.employee_id}</td>
@@ -552,12 +561,10 @@ async function cargarEmpleadosAdmin() {
                            class="form-input text-xs py-1" placeholder="Área">
                 </td>
                 <td>
-                    <input type="time" id="emp-hora-${e.id}" value="${he}"
-                           class="form-input text-xs py-1" title="Vacío = default">
-                </td>
-                <td>
-                    <input type="number" id="emp-tol-${e.id}" value="${e.tolerancia_minutos ?? ''}"
-                           class="form-input text-xs py-1 w-20" min="0" placeholder="Default">
+                    <select id="emp-turno-${e.id}" class="form-input text-xs py-1">
+                        <option value="">— Sin turno —</option>
+                        ${opcionesTurno(e.turno_id)}
+                    </select>
                 </td>
                 <td>
                     <button onclick="guardarEmpleado(${e.id})" class="btn-success text-xs py-1 px-3">Guardar</button>
@@ -568,13 +575,11 @@ async function cargarEmpleadosAdmin() {
 }
 
 async function guardarEmpleado(id) {
+    const turnoValue = document.getElementById(`emp-turno-${id}`).value;
     const payload = {
         activo:             document.getElementById(`emp-activo-${id}`).checked,
         departamento:       document.getElementById(`emp-dept-${id}`).value.trim() || null,
-        hora_entrada:       document.getElementById(`emp-hora-${id}`).value || null,
-        tolerancia_minutos: document.getElementById(`emp-tol-${id}`).value
-                              ? parseInt(document.getElementById(`emp-tol-${id}`).value)
-                              : null,
+        turno_id:           turnoValue ? parseInt(turnoValue) : null,
     };
     try {
         const res = await apiFetch(`${API}/empleados/${id}`, {
@@ -636,6 +641,170 @@ async function checkSyncStatus() {
             cargarEmpleadosParaReporte();
         }
     } catch(e) {}
+}
+
+// ── Admin: Turnos ───────────────────────────────────────────────────────────
+const DIAS_SEMANA = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+
+async function cargarTurnos() {
+    if (!tienePermiso('admin_empleados')) return;
+    try {
+        const res = await apiFetch(`${API}/turnos`);
+        if (!res.ok) return;
+        adminTurnos = await res.json();
+        renderizarTurnos();
+    } catch(e) { console.error('Admin turnos:', e); }
+}
+
+function renderizarTurnos() {
+    const tbody = document.getElementById('tabla-turnos');
+    if (!adminTurnos.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-500 text-xs">No hay turnos. Crea uno con el botón de arriba.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = adminTurnos.map(t => {
+        const celdas = t.horarios_hoy.map((h, idx) => {
+            if (!h) return `<td class="text-slate-500 text-xs">—</td>`;
+            return `<td class="text-xs">
+                <div class="font-mono text-white">${h.hora_entrada}</div>
+                <div class="text-[10px] text-slate-400">tol: ${h.tolerancia_minutos} min</div>
+                <button onclick="mostrarFormVigencia(${t.id}, ${idx})" class="text-[10px] text-sky-400 hover:text-sky-300 mt-1">+ vigencia</button>
+            </td>`;
+        }).join('');
+        return `
+        <tr>
+            <td class="font-medium text-white">${t.nombre}</td>
+            ${celdas}
+            <td>
+                <button onclick="editarTurno(${t.id})" class="btn-success text-xs py-1 px-2 mb-1">Editar</button>
+                <button onclick="eliminarTurno(${t.id})" class="btn-danger text-xs py-1 px-2">Eliminar</button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+function mostrarFormTurno() {
+    document.getElementById('form-turno').classList.remove('hidden');
+    document.getElementById('form-vigencia').classList.add('hidden');
+    document.getElementById('titulo-form-turno').textContent = 'Nuevo turno';
+    document.getElementById('turno-id').value = '';
+    document.getElementById('turno-nombre').value = '';
+    document.getElementById('turno-salida').value = '';
+    const grid = document.getElementById('turno-horarios-grid');
+    grid.innerHTML = DIAS_SEMANA.map((dia, idx) => `
+        <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-2">
+            <p class="text-xs font-semibold text-slate-300">${dia}</p>
+            <div>
+                <label class="text-[10px] text-slate-400">Entrada</label>
+                <input type="time" id="turno-hora-${idx}" class="form-input text-xs py-1" value="07:30">
+            </div>
+            <div>
+                <label class="text-[10px] text-slate-400">Tolerancia (min)</label>
+                <input type="number" id="turno-tol-${idx}" class="form-input text-xs py-1" value="10" min="0">
+            </div>
+        </div>
+    `).join('');
+}
+
+function cancelarFormTurno() {
+    document.getElementById('form-turno').classList.add('hidden');
+}
+
+async function guardarTurno() {
+    const id = document.getElementById('turno-id').value;
+    const horarios = DIAS_SEMANA.map((_, idx) => ({
+        dia_semana: idx,
+        hora_entrada: document.getElementById(`turno-hora-${idx}`).value,
+        tolerancia_minutos: parseInt(document.getElementById(`turno-tol-${idx}`).value) || 0,
+    }));
+    const payload = {
+        nombre: document.getElementById('turno-nombre').value.trim(),
+        hora_salida: document.getElementById('turno-salida').value || null,
+        horarios,
+    };
+    try {
+        const url = id ? `${API}/turnos/${id}` : `${API}/turnos`;
+        const method = id ? 'PUT' : 'POST';
+        const res = await apiFetch(url, { method, body: payload });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Error'); }
+        showToast(id ? 'Turno actualizado' : 'Turno creado', 'success');
+        cancelarFormTurno();
+        await cargarTurnos();
+        await cargarEmpleadosAdmin();
+    } catch(e) { showToast(`Error: ${e.message}`, 'error'); }
+}
+
+async function editarTurno(id) {
+    try {
+        const res = await apiFetch(`${API}/turnos/${id}`);
+        if (!res.ok) throw new Error('No se pudo cargar el turno');
+        const t = await res.json();
+        document.getElementById('form-turno').classList.remove('hidden');
+        document.getElementById('form-vigencia').classList.add('hidden');
+        document.getElementById('titulo-form-turno').textContent = `Editar turno: ${t.nombre}`;
+        document.getElementById('turno-id').value = t.id;
+        document.getElementById('turno-nombre').value = t.nombre;
+        document.getElementById('turno-salida').value = t.hora_salida || '';
+        const grid = document.getElementById('turno-horarios-grid');
+        grid.innerHTML = DIAS_SEMANA.map((dia, idx) => {
+            const h = t.horarios_hoy[idx] || { hora_entrada: '07:30', tolerancia_minutos: 10 };
+            return `
+            <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-2">
+                <p class="text-xs font-semibold text-slate-300">${dia}</p>
+                <div>
+                    <label class="text-[10px] text-slate-400">Entrada</label>
+                    <input type="time" id="turno-hora-${idx}" class="form-input text-xs py-1" value="${h.hora_entrada}">
+                </div>
+                <div>
+                    <label class="text-[10px] text-slate-400">Tolerancia (min)</label>
+                    <input type="number" id="turno-tol-${idx}" class="form-input text-xs py-1" value="${h.tolerancia_minutos}" min="0">
+                </div>
+            </div>`;
+        }).join('');
+    } catch(e) { showToast(`Error: ${e.message}`, 'error'); }
+}
+
+async function eliminarTurno(id) {
+    if (!confirm('¿Eliminar este turno? Los empleados asignados a él quedarán sin turno.')) return;
+    try {
+        const res = await apiFetch(`${API}/turnos/${id}`, { method: 'DELETE' });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Error'); }
+        showToast('Turno eliminado', 'success');
+        await cargarTurnos();
+        await cargarEmpleadosAdmin();
+    } catch(e) { showToast(`Error: ${e.message}`, 'error'); }
+}
+
+function mostrarFormVigencia(turnoId, diaSemana) {
+    document.getElementById('form-vigencia').classList.remove('hidden');
+    document.getElementById('form-turno').classList.add('hidden');
+    document.getElementById('vigencia-turno-id').value = turnoId;
+    document.getElementById('vigencia-dia-semana').value = diaSemana;
+    document.getElementById('vigencia-dia-nombre').textContent = DIAS_SEMANA[diaSemana];
+    document.getElementById('vigencia-hora').value = '07:30';
+    document.getElementById('vigencia-tolerancia').value = '10';
+    document.getElementById('vigencia-desde').value = hoy();
+}
+
+function cancelarFormVigencia() {
+    document.getElementById('form-vigencia').classList.add('hidden');
+}
+
+async function guardarVigencia() {
+    const payload = {
+        dia_semana: parseInt(document.getElementById('vigencia-dia-semana').value),
+        hora_entrada: document.getElementById('vigencia-hora').value,
+        tolerancia_minutos: parseInt(document.getElementById('vigencia-tolerancia').value) || 0,
+        vigente_desde: document.getElementById('vigencia-desde').value,
+    };
+    const turnoId = document.getElementById('vigencia-turno-id').value;
+    try {
+        const res = await apiFetch(`${API}/turnos/${turnoId}/horarios`, { method: 'POST', body: payload });
+        if (!res.ok) { const e = await res.json(); throw new Error(e.detail || 'Error'); }
+        showToast('Vigencia guardada', 'success');
+        cancelarFormVigencia();
+        await cargarTurnos();
+    } catch(e) { showToast(`Error: ${e.message}`, 'error'); }
 }
 
 async function cargarMarcasSinAsociar() {

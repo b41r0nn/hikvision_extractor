@@ -17,12 +17,12 @@
 | `extractor_hikvision.py` | ✅ Funcional | Extracción ISAPI con paginación AM/PM/Q1-Q4. Lee credenciales del biométrico desde `.env`. Probado contra dispositivo real. |
 | `backend/sync_empleados.py` | ✅ Funcional | Sincroniza `Empleado` desde `/ISAPI/AccessControl/UserInfo/Search` con upsert por `employeeNo`. Nunca elimina. |
 | `backend/main.py` | ✅ Funcional | API FastAPI con endpoints de KPIs, tardanzas, registros, empleados, turnos, festivos, reportes, correo, sincronización de empleados, auth y RBAC. `create_all` ejecuta en el `lifespan`. |
-| `backend/models.py` | ✅ Funcional | `Turno`, `Empleado`, `Festivo`, `RegistroAsistencia`, `Rol`, `Permiso`, `Usuario`. |
+| `backend/models.py` | ✅ Funcional | `Turno`, `TurnoHorario`, `Empleado`, `Festivo`, `RegistroAsistencia`, `Rol`, `Permiso`, `Usuario`. |
 | `backend/auth.py` | ✅ Funcional | JWT, hash Argon2id, expiración configurable, roles/permisos, `require_perm()` y seed de roles. |
 | `backend/timezone.py` | ✅ Funcional | Helper `hoy_bogota()` / `ahora_bogota()` para que todo el backend use `America/Bogota`. |
 | `backend/config_service.py` | ✅ Funcional | Configuración persistente: destinatarios de correo y periodicidad de reportes. |
 | `backend/database.py` | ✅ Funcional | Conexión PostgreSQL via `DATABASE_URL` en `.env`. |
-| `backend/report_service.py` | ✅ Funcional | Generación Excel dinámica, cálculo de tardanzas, turno default para empleados sin turno propio. |
+| `backend/report_service.py` | ✅ Funcional | Generación Excel dinámica, cálculo de tardanzas, horario vigente por `turno_horario`. |
 | `backend/email_service.py` | ✅ Funcional | Envío SMTP de reportes semanal/mensual. Lee destinatarios desde la base de datos (configurables en admin). SMTP sigue configurado en `.env`. |
 | `backend/scheduler.py` | ✅ Funcional | APScheduler: sync empleados, extracción diaria, reporte semanal, reporte mensual. |
 | `frontend/index.html` | ✅ Funcional | UI con login, cambio obligatorio de contraseña, dashboard, reportes, administración, usuarios/roles. |
@@ -58,11 +58,16 @@
 - La sincronización corre diariamente a las 7:00 AM vía scheduler y también se puede disparar manualmente desde el admin (`POST /api/empleados/sync`).
 - Las marcas sin empleado asociado se siguen exponiendo en `/api/registros/sin-asociar` para revisión.
 
-### 2.3 Turno individual por empleado
+### 2.3 Turnos versionados por día de semana (Fase A)
 
-- Cada empleado tiene su propia `hora_entrada` y `tolerancia_minutos` en la tabla `Empleado`.
-- Si no se configuran, se usa el turno default del `.env` (`DEFAULT_TURNO_ENTRADA`, `DEFAULT_TOLERANCIA_MINUTOS`).
-- El catálogo compartido de turnos ya no se usa en la UI; el admin configura hora y tolerancia directamente en la vista de empleados.
+- La fuente de verdad del horario es la tabla `turno_horario`, vinculada a `Turno`.
+- Cada turno tiene hasta 5 horarios (lunes=0 ... viernes=4), cada uno con una
+  fecha de vigencia (`vigente_desde`). Al cambiar un horario se inserta una
+  nueva fila; el historial se conserva.
+- Cada empleado apunta a un `turno_id`. Las columnas `hora_entrada` y
+  `tolerancia_minutos` de `Empleado` quedan deprecadas en Fase A.
+- `DEFAULT_TURNO_ENTRADA` y `DEFAULT_TOLERANCIA_MINUTOS` del `.env` quedan
+  deprecados; todo empleado debe tener un turno real.
 
 ### 2.4 Empleados activos aparecen en el reporte
 
@@ -218,7 +223,7 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 2. **SMTP**: `SMTP_USER`, `SMTP_APP_PASSWORD` y `REPORT_RECIPIENTS` deben configurarse en `.env` para reportes automáticos. **Actualmente pospuesto** hasta tener cuenta Gmail.
 3. **Timezone**: backend y frontend fuerzan `America/Bogota`; el contenedor `backend` tiene `TZ=America/Bogota` instalado. No depende del reloj del host.
 4. **Buffer del biométrico**: mantener la extracción diaria a las 8:00 PM para no perder marcaciones por el buffer circular del dispositivo. Además, al arrancar el contenedor se hace backfill automático desde el día siguiente a la última extracción exitosa hasta hoy.
-5. **Empleados sin turno**: usan `DEFAULT_TURNO_ENTRADA` y `DEFAULT_TOLERANCIA_MINUTOS` del `.env` para cálculo de tardanzas.
+5. **Empleados sin turno**: después de la Fase B de migración de datos, todos los empleados tendrán un `turno_id` real (incluido un "Turno Default" para quienes usaban el default del `.env`). Antes de Fase B, el cálculo falla ruidosamente con `HorarioNoConfiguradoError`.
 6. **Marcas casi simultáneas**: el Excel agrupa marcas dentro de `MARCA_FUSION_MINUTOS` minutos como una sola "Marca N". Ajustar o desactivar en `.env` según política de REDIHOS.
 7. **Seguridad**: cambiar `SECRET_KEY`, `ADMIN_USERNAME` y `ADMIN_PASSWORD` en producción. El token JWT expira según `ACCESS_TOKEN_EXPIRE_MINUTES`. Los usuarios sembrados desde `.env` deberán cambiar su contraseña en el primer login.
 8. **Dashboard**: no muestra tarjeta de festivos; el botón de extracción se llama "Actualizar Marcaciones"; hay una vista "Marcas del día" con tabla de solo lectura; muestra tarjetas de % asistencia a tiempo y minutos perdidos por tardanza.
@@ -234,7 +239,7 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 - **Panel de festivos**: solo lectura, administrado automáticamente por la librería `holidays`.
 - **Reporte Excel**: incluye todos los empleados `activo=True`, con o sin turno asignado.
 - **Fusión de marcas**: marcas del mismo empleado/día dentro de `MARCA_FUSION_MINUTOS` se muestran como una sola "Marca N". El cálculo de columnas dinámicas usa los datos fusionados.
-- **Turno default**: empleados activos sin turno propio usan `DEFAULT_TURNO_ENTRADA` y `DEFAULT_TOLERANCIA_MINUTOS`.
+- **Turno default**: empleados activos sin turno propio usan un turno real llamado "Turno Default" vinculado a `turno_horario`. Las variables `DEFAULT_TURNO_ENTRADA` y `DEFAULT_TOLERANCIA_MINUTOS` del `.env` están deprecadas.
 - **RBAC**: todos los endpoints protegidos requieren JWT y un permiso específico. El rol `Admin` tiene todos los permisos; el rol `Reportes` solo dashboard y reportes.
 
 ---
@@ -342,6 +347,38 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 - **Razonamiento:** `extractor_hikvision.main()` itera día por día y llama `fetch_day()`, que a su vez llama `fetch_range()` con ventanas de 24h (con fallback AM/PM/Q1-Q4). Nunca carga el rango completo en memoria; el consumo de memoria por día está acotado por la paginación (`BATCH_SIZE=50`) y el lock `_device_lock` serializa las llamadas. El watchdog de 1h (`BACKFILL_TIMEOUT_SEC=3600`) cubre el gap práctico esperado (~1 semana); si se necesitara más, el backfill retoma desde el último día commiteado tras el reinicio del contenedor.
 
 ---
+
+### 8.7 Fase A — Versionado de horarios por día de semana (28 de julio de 2026)
+
+**Decisión de arquitectura:** se elimina el fallback a `DEFAULT_TURNO_ENTRADA`/`DEFAULT_TOLERANCIA_MINUTOS` del `.env`. Todo empleado debe tener un `turno_id` real. Cada turno tiene horarios versionados por día de semana en `turno_horario`.
+
+**Cambios implementados:**
+- Migración Alembic `25e5f322addf_add_turno_horario`: nueva tabla `turno_horario` con índice único `(turno_id, dia_semana, vigente_desde)` y `ON DELETE CASCADE`.
+- Modelo `TurnoHorario` en `backend/models.py`.
+- Función `obtener_horario_vigente()` en `backend/report_service.py`.
+- `calcular_tardanzas_dia()` lee el horario vigente del `turno_id` del empleado para el día de la semana y fecha. Si no hay turno u horario, lanza `HorarioNoConfiguradoError`.
+- Eliminado el fallback a `DEFAULT_TURNO_ENTRADA`/`DEFAULT_TOLERANCIA_MINUTOS` en el cálculo. Variables deprecadas en `.env.example`.
+- Endpoints de turnos actualizados en `backend/main.py`:
+  - `GET /api/turnos` con horarios vigentes de hoy.
+  - `POST /api/turnos` crea turno + 5 horarios iniciales.
+  - `GET /api/turnos/{id}` con historial.
+  - `PUT /api/turnos/{id}` actualiza nombre/hora_salida.
+  - `POST /api/turnos/{id}/horarios` inserta nueva vigencia (nunca update).
+- Panel Admin: nueva pestaña "Turnos" con 5 campos (lunes a viernes), fecha de vigencia visible y botón para agregar nueva vigencia. Los empleados se editan con un select de turno.
+
+**Evidencia:**
+- `test_evidencia/logs/test_a1_turno_horario_alembic.txt` — upgrade/downgrade/upgrade en SQLite y verificación de índice único.
+- `test_evidencia/test_turno_horario_vigencia.py` + `test_evidencia/logs/test_turno_horario_vigencia_console.txt`.
+  - Lunes 2026-07-27 (antes de vigencia 2026-08-04) → `hora_entrada=07:30`.
+  - Lunes 2026-08-10 (después de vigencia 2026-08-04) → `hora_entrada=08:00`.
+  - Martes 2026-08-04 → `hora_entrada=07:30`.
+  - Turno sin horario para lunes → `HorarioNoConfiguradoError`.
+  - Resultado: **PASS**.
+
+**Fase B bloqueada** hasta tener:
+1. Resultado real de las queries contra producción (empleados sin `turno_id`, tabla `empleados` vs `empleado`).
+2. Fecha real de vigencia del horario nuevo de lunes.
+3. Confirmación de `pg_dump` reciente + autorización del arquitecto.
 
 ## 9. Problemas actuales / bloqueantes abiertos
 

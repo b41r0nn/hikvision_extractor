@@ -1,6 +1,7 @@
 from sqlalchemy import (
-    Column, Integer, String, Date, Time, Boolean, ForeignKey
+    Column, Integer, SmallInteger, String, Date, DateTime, Time, Boolean, ForeignKey, UniqueConstraint
 )
+from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -10,11 +11,30 @@ class Turno(Base):
 
     id                  = Column(Integer, primary_key=True, index=True)
     nombre              = Column(String, nullable=False)          # ej. "Turno A", "Administrativo"
-    hora_entrada        = Column(Time, nullable=False)            # ej. 07:30
+    hora_entrada        = Column(Time, nullable=False)            # DEPRECADO: leer desde turno_horario
     hora_salida         = Column(Time, nullable=True)             # ej. 17:00 (referencia, no obligatoria)
-    tolerancia_minutos  = Column(Integer, default=10, nullable=False)
+    tolerancia_minutos  = Column(Integer, default=10, nullable=False)  # DEPRECADO: leer desde turno_horario
 
     empleados = relationship("Empleado", back_populates="turno")
+    horarios  = relationship("TurnoHorario", back_populates="turno", cascade="all, delete-orphan")
+
+
+class TurnoHorario(Base):
+    __tablename__ = "turno_horario"
+
+    id                  = Column(Integer, primary_key=True, index=True)
+    turno_id            = Column(Integer, ForeignKey("turnos.id", ondelete="CASCADE"), nullable=False)
+    dia_semana          = Column(SmallInteger, nullable=False)    # 0=lunes, 1=martes, ..., 4=viernes
+    hora_entrada        = Column(Time, nullable=False)
+    tolerancia_minutos  = Column(Integer, nullable=False)
+    vigente_desde       = Column(Date, nullable=False)
+    created_at          = Column(DateTime, server_default=func.now(), nullable=False)
+
+    turno = relationship("Turno", back_populates="horarios")
+
+    __table_args__ = (
+        UniqueConstraint("turno_id", "dia_semana", "vigente_desde", name="uq_turno_horario_vigencia"),
+    )
 
 
 class Empleado(Base):

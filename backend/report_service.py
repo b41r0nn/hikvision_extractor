@@ -14,7 +14,7 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 from sqlalchemy.orm import Session
 
-from .models import RegistroAsistencia, Empleado, Turno, Festivo
+from .models import RegistroAsistencia, Empleado, Turno, TurnoHorario, Festivo
 from .timezone import hoy_bogota
 
 # ── Colores ────────────────────────────────────────────────────────────────────
@@ -136,6 +136,41 @@ def _fusionar_marcas_por_empleado_dia(
 
 
 # ── Lógica de tardanza ─────────────────────────────────────────────────────────
+class HorarioNoConfiguradoError(Exception):
+    """El turno no tiene un horario vigente configurado para el día solicitado."""
+
+
+def obtener_horario_vigente(
+    db: Session,
+    turno_id: int,
+    dia_semana: int,
+    fecha: date,
+) -> tuple:
+    """
+    Retorna (hora_entrada, tolerancia_minutos) vigentes para un turno, día de
+    semana y fecha dados. Si no hay fila configurada, lanza
+    HorarioNoConfiguradoError.
+
+    dia_semana: 0=lunes, 1=martes, ..., 4=viernes.
+    """
+    horario = (
+        db.query(TurnoHorario)
+        .filter(
+            TurnoHorario.turno_id == turno_id,
+            TurnoHorario.dia_semana == dia_semana,
+            TurnoHorario.vigente_desde <= fecha,
+        )
+        .order_by(TurnoHorario.vigente_desde.desc())
+        .first()
+    )
+    if horario is None:
+        raise HorarioNoConfiguradoError(
+            f"Turno {turno_id} no tiene horario configurado para "
+            f"dia_semana={dia_semana} vigente desde {fecha}"
+        )
+    return horario.hora_entrada, horario.tolerancia_minutos
+
+
 def calcular_tardanza(primera_marca: time, hora_turno: time, tolerancia: int) -> Optional[int]:
     """Retorna minutos de tardanza (>0) o None si llegó a tiempo."""
     entrada = datetime.combine(hoy_bogota(), hora_turno)
@@ -436,12 +471,12 @@ def calcular_tardanzas_dia(db: Session, dia: date) -> List[dict]:
     """
     Retorna lista de dicts con empleados registrados que llegaron tarde ese día.
     Ignora marcas de personas no asociadas a un Empleado.
-    """
-    import os
-    default_hora = os.getenv("DEFAULT_TURNO_ENTRADA", "07:30")
-    default_tol  = int(os.getenv("DEFAULT_TOLERANCIA_MINUTOS", "10"))
-    default_time  = time(*[int(x) for x in default_hora.split(":")])
 
+    Desde la Fase A del versionado de horarios, la fuente de verdad es la
+    tabla turno_horario. No hay fallback a DEFAULT_TURNO_ENTRADA ni a horario
+    individual en la tabla empleados. Si un empleado no tiene turno_id o su
+    turno no tiene horario para el día, se lanza HorarioNoConfiguradoError.
+    """
     festivos = get_festivos(dia, dia)
     if not es_dia_laboral(dia, festivos):
         return []
@@ -466,20 +501,15 @@ def calcular_tardanzas_dia(db: Session, dia: date) -> List[dict]:
         if not emp:
             continue
 
-        # Turno individual; si no está configurado, usa el default del .env
-        if emp.hora_entrada is not None:
-            hora_turno = emp.hora_entrada
-        elif emp.turno:
-            hora_turno = emp.turno.hora_entrada
-        else:
-            hora_turno = default_time
+        if emp.turno_id is None:
+            raise HorarioNoConfiguradoError(
+                f"Empleado '{emp.nombre}' (id={emp.id}) no tiene turno_id asignado. "
+                f"Correr migración de datos de Fase B antes de calcular tardanzas."
+            )
 
-        if emp.tolerancia_minutos is not None:
-            tolerancia = emp.tolerancia_minutos
-        elif emp.turno:
-            tolerancia = emp.turno.tolerancia_minutos
-        else:
-            tolerancia = default_tol
+        hora_turno, tolerancia = obtener_horario_vigente(
+            db, emp.turno_id, dia.weekday(), dia
+        )
 
         mins = calcular_tardanza(primera_hora, hora_turno, tolerancia)
         if mins is not None:
