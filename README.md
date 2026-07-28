@@ -90,7 +90,7 @@ La conexión se define en `backend/database.py`:
 ```python
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://admin:adminpassword@db:5432/hikvision"
+    "sqlite:///./hikvision.db"
 )
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -446,9 +446,9 @@ Copiar `.env.example` a `.env` y completar los valores reales.
 
 | Variable | Ejemplo | Descripción |
 | --- | --- | --- |
-| `DATABASE_URL` | `postgresql://admin:adminpassword@db:5432/hikvision` | URL de conexión a PostgreSQL. |
+| `DATABASE_URL` | `postgresql://admin:<POSTGRES_PASSWORD>@db:5432/hikvision` | URL de conexión a PostgreSQL. |
 | `POSTGRES_USER` | `admin` | Usuario de PostgreSQL (debe coincidir con `docker-compose.yml`). |
-| `POSTGRES_PASSWORD` | `adminpassword` | Contraseña de PostgreSQL. |
+| `POSTGRES_PASSWORD` | `<POSTGRES_PASSWORD>` | Contraseña de PostgreSQL. |
 | `POSTGRES_DB` | `hikvision` | Nombre de la base de datos. |
 | `DEVICE_IP` | `192.168.1.127` | IP del biométrico en la red local. |
 | `DEVICE_USER` | `admin` | Usuario del biométrico. |
@@ -556,7 +556,7 @@ Las credenciales están en el `.env`:
 
 ```env
 POSTGRES_USER=admin
-POSTGRES_PASSWORD=adminpassword
+POSTGRES_PASSWORD=<POSTGRES_PASSWORD>
 POSTGRES_DB=hikvision
 ```
 
@@ -608,7 +608,7 @@ psql -h localhost -p 5432 -U admin -d hikvision
 ```python
 from sqlalchemy import create_engine, text
 
-DATABASE_URL = "postgresql://admin:adminpassword@localhost:5432/hikvision"
+DATABASE_URL = "postgresql://admin:<POSTGRES_PASSWORD>@localhost:5432/hikvision"
 engine = create_engine(DATABASE_URL)
 
 with engine.connect() as conn:

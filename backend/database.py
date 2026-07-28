@@ -8,7 +8,7 @@ load_dotenv()
 
 SQLALCHEMY_DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "postgresql://admin:adminpassword@db:5432/hikvision"
+    "sqlite:///./hikvision.db"
 )
 
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
