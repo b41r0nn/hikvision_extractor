@@ -28,7 +28,7 @@ def upgrade() -> None:
         sa.Column('hora_entrada', sa.Time(), nullable=False),
         sa.Column('tolerancia_minutos', sa.Integer(), nullable=False),
         sa.Column('vigente_desde', sa.Date(), nullable=False),
-        sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+        sa.Column('created_at', sa.DateTime(), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
         sa.ForeignKeyConstraint(['turno_id'], ['turnos.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id'),
     )
