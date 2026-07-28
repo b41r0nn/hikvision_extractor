@@ -88,17 +88,22 @@ roles, permisos y configuración de correo desde una interfaz web.
 La conexión se define en `backend/database.py`:
 
 ```python
-SQLALCHEMY_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./hikvision.db"
-)
+SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
+if not SQLALCHEMY_DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL no está configurada. Revisá el .env — "
+        "no hay fallback por diseño, para evitar arrancar silenciosamente "
+        "contra una BD equivocada."
+    )
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 ```
 
 En Docker, `DATABASE_URL` apunta al servicio `db` definido en
 `docker-compose.yml`. En desarrollo local se puede usar SQLite con
-`DATABASE_URL=sqlite:///./test.db`.
+`DATABASE_URL=sqlite:///./test.db`. Si la variable no está configurada, el
+proceso falla al arrancar.
 
 ### 3.2 Tablas principales
 
