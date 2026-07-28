@@ -413,41 +413,48 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   - `COMMIT exitoso`
   - Resultado: **PASS**.
 
-**Pendiente:** ejecución contra la BD PostgreSQL real. No se puede completar desde este entorno porque Docker Desktop no está corriendo, no hay PostgreSQL en `localhost:5432` y no hay cliente PostgreSQL instalado localmente.
+**Ejecución en producción confirmada por el arquitecto:**
+- `SELECT count(*) FROM empleados WHERE turno_id IS NULL` → **0**.
+- `SELECT count(*) FROM turno_horario` → **10**.
+- Backend corriendo en vivo sin errores (logs limpios).
+- Dashboard verifica que el horario nuevo aplica en vivo.
 
-**Backup movido fuera del repo** por seguridad:
+### 8.9 Cierre de ronda — Horario por día de semana v1.1 (28 de julio de 2026)
+
+**Tag:** `v1.1-horario-lunes`  
+**Mensaje:** "Horario por dia de semana + tolerancia 1min, migracion 71 empleados a Turno General"
+
+**Resumen de la funcionalidad:**
+- Nueva tabla `turno_horario` con horarios versionados por día de semana (`dia_semana` 0=lunes...4=viernes) y fecha de vigencia (`vigente_desde`).
+- Función `obtener_horario_vigente(turno_id, dia_semana, fecha)` devuelve el horario vigente más reciente para una fecha dada.
+- Al cambiar un horario se inserta una nueva fila; el historial se conserva.
+- El cálculo de tardanzas (`calcular_tardanzas_dia`) usa siempre `turno_horario` a través del `turno_id` del empleado.
+- Panel Admin tiene pestaña "Turnos" con 5 campos y gestión de vigencias.
+
+**Migración de datos:**
+- 71 empleados migrados al "Turno General".
+- Vigencia base (`2020-01-01`): 07:30 todos los días, tolerancia 10 minutos.
+- Vigencia nueva (`2026-07-28`):
+  - Lunes: 08:00, tolerancia 1 minuto.
+  - Martes a viernes: 07:30, tolerancia 1 minuto.
+
+**Fallback eliminado:**
+- `DEFAULT_TURNO_ENTRADA` y `DEFAULT_TOLERANCIA_MINUTOS` ya no se usan en el código de cálculo.
+- Siguen en `.env.example` con comentario de deprecación por si se necesita revertir rápido.
+
+**Backup pre-migración:**
 `C:\Users\Sistemas\AppData\Local\Temp\opencode\backups\backup_pre_horario_lunes_20260728_0832.sql`
+(fuera del repositorio por seguridad).
 
-**Comandos para ejecutar en el servidor una vez levantado Docker:**
+**Evidencia generada (queda en `test_evidencia/logs/`):**
+- `test_a1_turno_horario_alembic.txt`
+- `test_turno_horario_vigencia_console.txt`
+- `migracion_turno_general_console.txt`
 
-```bash
-# 0. Confirmar versión de schema en BD real
-docker compose exec db psql -U admin -d hikvision -c "SELECT * FROM alembic_version;"
+### 8.10 Deuda técnica pendiente (no resolver ahora)
 
-# Si NO es 25e5f322addf, aplicar schema primero
-export DATABASE_URL="postgresql://admin:adminpassword@localhost:5432/hikvision"
-.venv/Scripts/python.exe -m alembic upgrade head
-
-# Verificar que turno_horario existe
-docker compose exec db psql -U admin -d hikvision -c "\dt"
-
-# Correr migración de datos desde el host
-export DATABASE_URL="postgresql://admin:adminpassword@localhost:5432/hikvision"
-.venv/Scripts/python.exe test_evidencia/migracion_turno_general.py
-
-# Post-migración
-docker compose exec db psql -U admin -d hikvision -c "SELECT count(*) FROM empleados WHERE turno_id IS NULL;"
-docker compose exec db psql -U admin -d hikvision -c "SELECT count(*) FROM turno_horario;"
-```
-
-Esperado post-migración: `0` y `10`.
-
-**Recién con post-migración 0/10, deploy autorizado:**
-
-```bash
-docker compose build --no-cache backend
-docker compose up -d --force-recreate backend frontend
-```
+- **`update_empleado` con clientes viejos:** queda pendiente confirmar si un cliente con caché de browser que envíe `hora_entrada`/`tolerancia_minutos` en el PUT debe ser ignorado silenciosamente o rechazado. Actualmente el endpoint simplemente no lee esos campos.
+- **Columnas deprecadas:** `hora_entrada`/`tolerancia_minutos` de `Turno` y `Empleado` siguen existiendo en el schema pero sin uso. Anotar como candidatas a limpieza en migración futura, no ahora.
 
 ## 9. Problemas actuales / bloqueantes abiertos
 
