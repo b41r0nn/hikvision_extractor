@@ -1,5 +1,5 @@
 from sqlalchemy import (
-    Column, Integer, SmallInteger, String, Date, DateTime, Time, Boolean, ForeignKey, UniqueConstraint
+    Column, Integer, SmallInteger, String, Date, DateTime, Time, Boolean, ForeignKey, UniqueConstraint, CheckConstraint
 )
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -89,6 +89,26 @@ class Configuracion(Base):
     id    = Column(Integer, primary_key=True, index=True)
     clave = Column(String, unique=True, nullable=False, index=True)
     valor = Column(String, nullable=False)
+
+
+class ConfiguracionCorreo(Base):
+    __tablename__ = "configuracion_correo"
+
+    id                 = Column(Integer, primary_key=True, index=True)
+    host               = Column(String, nullable=False)
+    puerto             = Column(Integer, nullable=False)
+    usuario            = Column(String, nullable=False)
+    password_encriptado = Column("password_encriptado", String, nullable=False)
+    remitente_nombre   = Column(String, nullable=True)
+    seguridad          = Column(String, nullable=False, default="starttls")  # none | starttls | ssl
+    updated_by         = Column(Integer, ForeignKey("usuarios.id"), nullable=True)
+    updated_at         = Column(DateTime, server_default=func.now(), nullable=False)
+
+    updated_by_user = relationship("Usuario", foreign_keys=[updated_by])
+
+    __table_args__ = (
+        CheckConstraint("id = 1", name="ck_configuracion_correo_una_sola_fila"),
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

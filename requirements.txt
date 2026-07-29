@@ -13,3 +13,4 @@ passlib
 argon2-cffi
 tzdata
 alembic
+cryptography

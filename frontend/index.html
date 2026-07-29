@@ -182,6 +182,9 @@
         <div class="text-xs text-slate-400 truncate" id="user-info">—</div>
         <button onclick="logout()" class="w-full text-left text-xs text-slate-500 hover:text-slate-300">Cerrar sesión</button>
         <p class="text-xs text-slate-600">Sistema Biométrico v3.0</p>
+        <p class="text-[10px] text-slate-700 leading-tight">
+            Diseñado por Bairon Calle Rivera — b41r0nn@gmail.com
+        </p>
     </div>
 </nav>
 
@@ -554,12 +557,66 @@
         <!-- TAB: Correo -->
         <div id="tab-correo" class="tab-content space-y-4">
             <div class="glass p-5 space-y-4">
-                <h3 class="text-sm font-semibold text-slate-300">Configuración de correo automático</h3>
-                <div id="correo-estado" class="text-xs text-slate-400 p-3 rounded-lg bg-slate-900/50 border border-slate-700"></div>
+                <h3 class="text-sm font-semibold text-slate-300">Configuración de correo SMTP</h3>
+                <p class="text-xs text-slate-400">La contraseña se guarda encriptada en la base de datos. Dejar el campo en blanco para no cambiarla.</p>
+
+                <form id="form-correo" class="space-y-3">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label text-xs">Servidor SMTP (host)</label>
+                            <input type="text" id="cfg-host" class="form-input text-xs" placeholder="smtp.gmail.com" required>
+                        </div>
+                        <div>
+                            <label class="form-label text-xs">Puerto</label>
+                            <input type="number" id="cfg-puerto" class="form-input text-xs" placeholder="587" required>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label text-xs">Usuario (correo)</label>
+                            <input type="text" id="cfg-usuario" class="form-input text-xs" placeholder="tu_correo@gmail.com" required>
+                        </div>
+                        <div>
+                            <label class="form-label text-xs">Contraseña</label>
+                            <input type="password" id="cfg-password" class="form-input text-xs" placeholder="********">
+                            <p class="text-[10px] text-slate-500 mt-0.5">Vacío = no cambiar la contraseña guardada.</p>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="form-label text-xs">Nombre del remitente</label>
+                            <input type="text" id="cfg-remitente" class="form-input text-xs" placeholder="Sistema de Asistencia REDIHOS">
+                        </div>
+                        <div>
+                            <label class="form-label text-xs">Seguridad</label>
+                            <select id="cfg-seguridad" class="form-input text-xs">
+                                <option value="starttls">STARTTLS</option>
+                                <option value="ssl">SSL</option>
+                                <option value="none">Ninguna</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between gap-3">
+                        <button type="submit" class="btn-primary text-xs px-4 py-2">Guardar configuración</button>
+                        <span id="correo-meta" class="text-[10px] text-slate-500"></span>
+                    </div>
+                </form>
+
+                <div class="pt-3 border-t border-slate-700/50 space-y-3">
+                    <h4 class="text-xs font-semibold text-slate-300">Correo de prueba</h4>
+                    <div class="flex gap-2">
+                        <input type="email" id="cfg-test-dest" class="form-input text-xs" placeholder="correo@redihos.com">
+                        <button onclick="probarCorreoConfig()" class="btn-primary text-xs px-3">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                            Enviar prueba
+                        </button>
+                    </div>
+                    <p id="correo-test-result" class="text-xs hidden"></p>
+                </div>
 
                 <!-- Destinatarios -->
-                <div class="space-y-2">
-                    <label class="form-label">Destinatarios</label>
+                <div class="pt-3 border-t border-slate-700/50 space-y-2">
+                    <label class="form-label">Destinatarios de reportes automáticos</label>
                     <div class="flex gap-2">
                         <input type="email" id="new-dest-email" class="form-input text-xs" placeholder="correo@redihos.com">
                         <button onclick="agregarDestinatario()" class="btn-primary text-xs px-3">Agregar</button>
@@ -597,9 +654,9 @@
                     <button onclick="guardarPeriodicidad()" class="btn-primary text-xs px-4 py-2">Guardar programación</button>
                 </div>
 
-                <button onclick="probarCorreo()" class="btn-primary">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                    Enviar correo de prueba
+                <!-- Legacy test button (hidden) -->
+                <button onclick="probarCorreo()" class="hidden">
+                    Enviar correo de prueba (legacy)
                 </button>
             </div>
         </div>

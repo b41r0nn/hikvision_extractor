@@ -20,13 +20,14 @@ from . import models
 from .database import engine, get_db, SessionLocal
 from .scheduler import start_scheduler
 from .report_service import generar_reporte, calcular_tardanzas_dia, get_festivos, es_dia_laboral, init_festivos, obtener_horario_vigente, HorarioNoConfiguradoError
-from .email_service import enviar_correo_prueba
+from .email_service import enviar_correo_prueba_a, CorreoNoConfiguradoError
 from .sync_empleados import sync_empleados
 from .auth import (
     get_current_user, require_perm, get_password_hash, verify_password,
     create_access_token, init_rbac, PERMISOS,
 )
 from . import config_service
+from . import config_correo_service
 from .scheduler import reschedule_report_jobs, scheduler as app_scheduler
 from .timezone import hoy_bogota, ahora_bogota
 import extractor_hikvision
@@ -318,6 +319,19 @@ class ReporteRequest(BaseModel):
 
 class ConfigCorreoUpdate(BaseModel):
     destinatarios: List[str]
+
+
+class ConfigSMTPRequest(BaseModel):
+    host: str
+    puerto: int
+    usuario: str
+    password: Optional[str] = None
+    remitente_nombre: Optional[str] = None
+    seguridad: str = "starttls"
+
+
+class ConfigSMTPTestRequest(BaseModel):
+    destinatario: str
 
 
 class RecipientCreate(BaseModel):
@@ -1038,19 +1052,90 @@ def generar_reporte_excel(
 # ══════════════════════════════════════════════════════════════════════════════
 #  CONFIGURACIÓN DE CORREO
 # ══════════════════════════════════════════════════════════════════════════════
-@app.get("/api/configuracion/correo")
+@app.get("/api/config/correo")
 def get_config_correo(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(require_perm("admin_correo")),
 ):
+    """Retorna la configuración SMTP actual (sin password en claro)."""
+    cfg = config_correo_service.get_config_segura(db)
+    return cfg or {
+        "host": None,
+        "puerto": None,
+        "usuario": None,
+        "remitente_nombre": None,
+        "seguridad": "starttls",
+        "password_configurado": False,
+        "updated_at": None,
+        "updated_by": None,
+    }
+
+
+@app.put("/api/config/correo")
+def update_config_correo(
+    req: ConfigSMTPRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(require_perm("admin_correo")),
+):
+    """Crea o actualiza la configuración SMTP. Si password es None o vacío,
+    se conserva el password existente.
+    """
+    try:
+        seguridad = config_correo_service.validar_seguridad(req.seguridad)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    password = req.password if req.password else None
+    try:
+        config_correo_service.upsert_config(
+            db,
+            host=req.host,
+            puerto=req.puerto,
+            usuario=req.usuario,
+            password=password,
+            remitente_nombre=req.remitente_nombre,
+            seguridad=seguridad,
+            updated_by_id=user.id,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+    return {"message": "Configuración de correo actualizada."}
+
+
+@app.post("/api/config/correo/test")
+def test_config_correo(
+    req: ConfigSMTPTestRequest,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(require_perm("admin_correo")),
+):
+    """Envía un correo de prueba usando la configuración SMTP guardada."""
+    import smtplib
+    try:
+        enviar_correo_prueba_a(req.destinatario)
+        return {"message": f"Correo de prueba enviado a {req.destinatario}."}
+    except CorreoNoConfiguradoError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except smtplib.SMTPException as e:
+        raise HTTPException(status_code=400, detail=f"Error SMTP: {e}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/configuracion/correo")
+def get_config_correo_legacy(
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(require_perm("admin_correo")),
+):
     """Retorna la configuración de correo actual (destinatarios y periodicidad)."""
+    cfg = config_correo_service.get_config_segura(db)
     return {
-        "smtp_host": os.getenv("SMTP_HOST", "smtp.gmail.com"),
-        "smtp_port": int(os.getenv("SMTP_PORT", "587")),
-        "smtp_user": os.getenv("SMTP_USER", ""),
+        "smtp_host": cfg["host"] if cfg else None,
+        "smtp_port": cfg["puerto"] if cfg else None,
+        "smtp_user": cfg["usuario"] if cfg else None,
         "destinatarios": config_service.get_recipients(db),
         "periodicidad":  config_service.get_periodicidad(db),
-        "configurado":   bool(os.getenv("SMTP_APP_PASSWORD")),
+        "configurado":   cfg["password_configurado"] if cfg else False,
     }
 
 
@@ -1094,12 +1179,17 @@ def set_periodicidad(
 
 
 @app.post("/api/configuracion/correo/prueba")
-def test_correo(
+def test_correo_legacy(
     user: models.Usuario = Depends(require_perm("admin_correo")),
 ):
-    """Envía un correo de prueba para verificar la configuración SMTP."""
+    """Envía un correo de prueba para verificar la configuración SMTP (legacy)."""
+    import smtplib
     try:
-        enviar_correo_prueba()
+        enviar_correo_prueba_a(None)
         return {"message": "Correo de prueba enviado. Revisa la bandeja de entrada de los destinatarios."}
+    except CorreoNoConfiguradoError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except smtplib.SMTPException as e:
+        raise HTTPException(status_code=400, detail=f"Error SMTP: {e}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -854,28 +854,75 @@ async function cargarFestivos() {
 async function cargarConfigCorreo() {
     if (!tienePermiso('admin_correo')) return;
     try {
-        const res  = await apiFetch(`${API}/configuracion/correo`);
-        if (!res.ok) return;
-        const data = await res.json();
-        document.getElementById('correo-estado').innerHTML =
-            `<span class="font-semibold ${data.configurado ? 'text-green-400' : 'text-orange-400'}">
-             ${data.configurado ? '✅ SMTP configurado' : '⚠️ SMTP sin configurar (revisa .env)'}
-             </span> — Servidor: <code class="text-sky-400">${data.smtp_host}:${data.smtp_port}</code>
-             — Cuenta: <code class="text-sky-400">${data.smtp_user || '(no configurado)'}</code>`;
+        const [cfgRes, legacyRes] = await Promise.all([
+            apiFetch(`${API}/config/correo`),
+            apiFetch(`${API}/configuracion/correo`),
+        ]);
+        if (!cfgRes.ok || !legacyRes.ok) return;
+        const cfg = await cfgRes.json();
+        const legacy = await legacyRes.json();
 
-        renderDestinatarios(data.destinatarios);
+        document.getElementById('cfg-host').value = cfg.host || '';
+        document.getElementById('cfg-puerto').value = cfg.puerto || '';
+        document.getElementById('cfg-usuario').value = cfg.usuario || '';
+        document.getElementById('cfg-password').value = '';
+        document.getElementById('cfg-remitente').value = cfg.remitente_nombre || '';
+        document.getElementById('cfg-seguridad').value = cfg.seguridad || 'starttls';
 
-        if (data.periodicidad) {
-            document.getElementById('sem-dia').value   = data.periodicidad.semanal.dia;
-            const sh = data.periodicidad.semanal.hora.toString().padStart(2,'0');
-            const sm = data.periodicidad.semanal.minuto.toString().padStart(2,'0');
+        const meta = document.getElementById('correo-meta');
+        if (cfg.updated_at) {
+            const fecha = new Date(cfg.updated_at).toLocaleString('es-CO', { timeZone: 'America/Bogota' });
+            meta.textContent = `Última actualización: ${fecha}${cfg.updated_by ? ' por ' + cfg.updated_by : ''}`;
+        } else {
+            meta.textContent = 'Sin configurar';
+        }
+
+        // Password placeholder visual
+        const pwInput = document.getElementById('cfg-password');
+        if (cfg.password_configurado) {
+            pwInput.placeholder = '********';
+        } else {
+            pwInput.placeholder = 'Contraseña requerida para crear config';
+        }
+
+        renderDestinatarios(legacy.destinatarios);
+
+        if (legacy.periodicidad) {
+            document.getElementById('sem-dia').value   = legacy.periodicidad.semanal.dia;
+            const sh = legacy.periodicidad.semanal.hora.toString().padStart(2,'0');
+            const sm = legacy.periodicidad.semanal.minuto.toString().padStart(2,'0');
             document.getElementById('sem-hora').value  = `${sh}:${sm}`;
-            document.getElementById('men-dia').value    = data.periodicidad.mensual.dia;
-            const mh = data.periodicidad.mensual.hora.toString().padStart(2,'0');
-            const mm = data.periodicidad.mensual.minuto.toString().padStart(2,'0');
+            document.getElementById('men-dia').value    = legacy.periodicidad.mensual.dia;
+            const mh = legacy.periodicidad.mensual.hora.toString().padStart(2,'0');
+            const mm = legacy.periodicidad.mensual.minuto.toString().padStart(2,'0');
             document.getElementById('men-hora').value = `${mh}:${mm}`;
         }
     } catch(e) { console.error('Config correo:', e); }
+}
+
+function setupFormCorreo() {
+    const form = document.getElementById('form-correo');
+    if (!form) return;
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const payload = {
+            host: document.getElementById('cfg-host').value.trim(),
+            puerto: parseInt(document.getElementById('cfg-puerto').value),
+            usuario: document.getElementById('cfg-usuario').value.trim(),
+            password: document.getElementById('cfg-password').value || null,
+            remitente_nombre: document.getElementById('cfg-remitente').value.trim() || null,
+            seguridad: document.getElementById('cfg-seguridad').value,
+        };
+        try {
+            const res = await apiFetch(`${API}/config/correo`, {
+                method: 'PUT', body: payload
+            });
+            const d = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(d.detail || 'Error');
+            showToast('Configuración guardada', 'success');
+            await cargarConfigCorreo();
+        } catch(err) { showToast(err.message || 'Error guardando', 'error'); }
+    });
 }
 
 function renderDestinatarios(lista) {
@@ -954,6 +1001,33 @@ async function probarCorreo() {
         if (res.ok) showToast(d.message, 'success');
         else showToast(d.detail || 'Error', 'error');
     } catch(e) { showToast('Error al contactar la API', 'error'); }
+}
+
+async function probarCorreoConfig() {
+    if (!tienePermiso('admin_correo')) { showToast('Sin permiso', 'error'); return; }
+    const destinatario = document.getElementById('cfg-test-dest').value.trim();
+    if (!destinatario || !destinatario.includes('@')) {
+        showToast('Ingresa un correo de prueba válido', 'error'); return;
+    }
+    const resultEl = document.getElementById('correo-test-result');
+    resultEl.classList.remove('hidden', 'text-green-400', 'text-red-400');
+    resultEl.textContent = 'Enviando...';
+    try {
+        const res = await apiFetch(`${API}/config/correo/test`, {
+            method: 'POST', body: { destinatario }
+        });
+        const d = await res.json().catch(() => ({}));
+        if (res.ok) {
+            resultEl.classList.add('text-green-400');
+            resultEl.textContent = d.message || 'Correo enviado';
+        } else {
+            resultEl.classList.add('text-red-400');
+            resultEl.textContent = d.detail || 'Error desconocido';
+        }
+    } catch(e) {
+        resultEl.classList.add('text-red-400');
+        resultEl.textContent = 'Error al contactar la API';
+    }
 }
 
 // ── Admin: Usuarios y Roles ────────────────────────────────────────────────
@@ -1109,5 +1183,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (repStart) repStart.value = lunes.toLocaleDateString('es-CO', { timeZone: 'America/Bogota', year:'numeric', month:'2-digit', day:'2-digit' }).split('/').reverse().join('-');
     if (repEnd)   repEnd.value   = fechaHoy;
 
+    setupFormCorreo();
     checkAuth();
 });
