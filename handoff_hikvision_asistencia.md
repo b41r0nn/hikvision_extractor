@@ -458,7 +458,8 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 
 ### 8.11 Configuración SMTP editable desde Admin (29 de julio de 2026)
 
-**Commit:** `576c38f`
+**Tag:** `v1.2-smtp-admin`  
+**Commit:** `d1285e9` (incluye README actualizado)
 
 **Cambios:**
 - Nueva tabla `configuracion_correo` con fila única (`id = 1`) y constraint `CHECK (id = 1)`.
