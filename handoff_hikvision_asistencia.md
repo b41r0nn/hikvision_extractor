@@ -478,7 +478,18 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   - `GET /api/config/correo` no devuelve password;
   - `PUT` con password vacío no pisa el password existente;
   - upgrade/downgrade/upgrade de la migración `f3321bd4c48b` OK.
+- `test_evidencia/logs/test_smtp_mock_console.txt`:
+  - `POST /api/config/correo/test` con smtplib mockeado: éxito devuelve 200 y mensaje con destinatario;
+  - error simulado devuelve 400 con el mensaje real del error SMTP (`Error SMTP: (421, 'No se pudo conectar al servidor SMTP')`), no genérico.
 - `test_evidencia/screenshot_footer_creditos.png` (footer con crédito, captura local con Playwright).
+
+**Nota sobre endpoints legacy `/api/configuracion/correo/*`:**
+- Sí existían antes de esta ronda. El endpoint base `GET /api/configuracion/correo` leía `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER` y `SMTP_APP_PASSWORD` desde `.env` y los devolvía al frontend, lo que obligaba a reiniciar el backend para cambiar la cuenta de correo.
+- Después del ajuste:
+  - `GET /api/configuracion/correo` ahora toma host, puerto, usuario y el flag `configurado` desde `configuracion_correo` (misma tabla que los nuevos endpoints).
+  - Los endpoints de destinatarios (`/destinatarios`) y periodicidad (`/periodicidad`) siguen usando la tabla `configuracion` (clave-valor), que sigue siendo la fuente de verdad para esos datos.
+  - `POST /api/configuracion/correo/prueba` usa la misma función `enviar_correo_prueba_a()` que el nuevo endpoint, por lo que lee la configuración de `configuracion_correo`.
+- No queda una segunda fuente de verdad para SMTP: todo host/puerto/usuario/password/seguridad pasa por `configuracion_correo`. Si alguien pega al endpoint viejo, lee/escribe la misma tabla nueva (salvo destinatarios y periodicidad, que no cambiaron de lugar).
 
 ## 9. Problemas actuales / bloqueantes abiertos
 
