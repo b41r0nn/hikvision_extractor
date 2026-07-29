@@ -3,8 +3,8 @@
 **Empresa:** REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S (REDIHOS)  
 **Fase:** 3 — Servicio web con PostgreSQL, dashboard, reportes automáticos y panel de administración  
 **Stack:** FastAPI + Uvicorn + PostgreSQL + Nginx + APScheduler + Docker  
-**Última actualización:** 27 de julio de 2026  
-**Estado:** Backfill, alerta, `misfire_grace_time`, retomo de backfill, fix `create_usuario` y lock de concurrencia cerrados con evidencia. Buffer overflow cerrado por diseño. Pendientes: deploy y confirmación del usuario sobre #4.1 (`ADMIN_PASSWORD` real) + generar `SECRET_KEY` real en `.env` de producción.
+**Última actualización:** 29 de julio de 2026  
+**Estado:** Feature `v1.2-smtp-admin` lista para deploy. Guía de migración a Ubuntu Server (`MIGRACION_UBUNTU.md`) y `docker-compose.prod.yml` creados. Pendientes reales antes del deploy: definir IP fija del servidor, dominio DNS exacto, proveedor SMTP y generar/confirmar credenciales de producción (`SECRET_KEY`, `FERNET_KEY`, `ADMIN_PASSWORD`, `POSTGRES_PASSWORD`).
 
 ---
 
@@ -491,6 +491,58 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   - Los endpoints de destinatarios (`/destinatarios`) y periodicidad (`/periodicidad`) siguen usando la tabla `configuracion` (clave-valor), que sigue siendo la fuente de verdad para esos datos.
   - `POST /api/configuracion/correo/prueba` usa la misma función `enviar_correo_prueba_a()` que el nuevo endpoint, por lo que lee la configuración de `configuracion_correo`.
 - No queda una segunda fuente de verdad para SMTP: todo host/puerto/usuario/password/seguridad pasa por `configuracion_correo`. Si alguien pega al endpoint viejo, lee/escribe la misma tabla nueva (salvo destinatarios y periodicidad, que no cambiaron de lugar).
+
+### 8.12 Guía de migración a Ubuntu Server (29 de julio de 2026)
+
+**Commit asociado:** cierre de `v1.2-smtp-admin`
+
+**Cambios:**
+- Se creó `docker-compose.prod.yml` con configuración lista para producción:
+  - PostgreSQL **sin puerto expuesto** al host.
+  - **Sin bind mounts** que expongan código fuente.
+  - Backend sin `--reload`.
+  - Frontend en puerto `80`, backend en puerto `8000`.
+  - Red bridge explícita y healthchecks para `db` y `backend`.
+- Se creó `MIGRACION_UBUNTU.md` con el procedimiento completo aprobado:
+  1. Requisitos previos e instalación de Docker.
+  2. Empaquetado del código en Windows con exclusiones de seguridad.
+  3. Exportación de la base de datos con `pg_dump`.
+  4. Transferencia con `scp`.
+  5. Restauración con `psql`.
+  6. Generación de `SECRET_KEY` y `FERNET_KEY` en producción.
+  7. Creación/reset del usuario admin.
+  8. Build y levantamiento con `docker-compose.prod.yml`.
+  9. Verificación con `curl` y logs.
+  10. Configuración de SMTP, destinatarios y DNS.
+  11. Backup automático con `cron` a las 2:00 AM.
+  12. Actualizaciones futuras y apartado preparado para HTTPS/Certbot.
+  13. Troubleshooting y checklist de seguridad.
+- `README.md` referencia `MIGRACION_UBUNTU.md` en la sección de deploy.
+
+**Decisiones de producción confirmadas:**
+- Migrar todo: código, configuración y datos de PostgreSQL.
+- PostgreSQL corre dentro de Docker, autocontenido, sin puerto expuesto.
+- Servidor Ubuntu en la misma red que el biométrico Hikvision.
+- Acceso por IP interna con redirección DNS (ej. `asistencia.redihos.local`).
+- Transferencia de archivos por red (`scp`) para facilitar actualizaciones.
+- Empaquetado en `.zip` desde Windows, excluyendo `.env`, `.git`,
+  `__pycache__`, `node_modules`, `pgdata` y `test_evidencia`.
+
+**Datos sensibles a resolver manualmente antes del deploy real:**
+- `SECRET_KEY`: generar nuevo en producción.
+- `FERNET_KEY`: debe coincidir con el backup si este incluye
+  `configuracion_correo`; de lo contrario, reconfigurar SMTP.
+- `POSTGRES_PASSWORD` y `ADMIN_PASSWORD`: contraseñas fuertes.
+- `DEVICE_IP`, `DEVICE_USER`, `DEVICE_PASS`: credenciales reales del biométrico.
+
+**Preguntas pendientes para resolver antes del deploy real:**
+1. ¿Cuál será la IP fija del servidor Ubuntu?
+2. ¿Cuál será el dominio DNS exacto (`asistencia.redihos.local` u otro)?
+3. ¿Qué proveedor SMTP usarán en producción (Gmail, Outlook, servidor propio)?
+4. ¿Se quiere dejar listo un script de empaquetado automático para Windows
+   (`build_deploy.ps1`)?
+
+---
 
 ## 9. Problemas actuales / bloqueantes abiertos
 

@@ -534,6 +534,22 @@ docker compose up -d backend
 docker compose up -d --force-recreate frontend
 ```
 
+### 9.5 Deploy en producción (Ubuntu Server)
+
+Para migrar el sistema completo (código, base de datos y configuración) a un
+servidor Ubuntu Server con Docker, seguir la guía detallada:
+
+📄 [`MIGRACION_UBUNTU.md`](MIGRACION_UBUNTU.md)
+
+Incluye: requisitos previos, empaquetado en Windows, exportación con
+`pg_dump`, transferencia `scp`, restauración, generación de claves,
+configuración de DNS, backups automáticos con `cron`, troubleshooting y
+checklist de seguridad.
+
+> **Importante:** en producción usar siempre `docker-compose.prod.yml`, que no
+> expone PostgreSQL al exterior, no usa bind mounts y no arranca Uvicorn con
+> `--reload`.
+
 ---
 
 ## 10. Comandos útiles
@@ -716,5 +732,7 @@ docker compose exec backend alembic upgrade head
 
 - `handoff_hikvision_asistencia.md`: notas internas de handoff, decisiones de
   negocio, evidencia de pruebas y próximos pasos.
+- `MIGRACION_UBUNTU.md`: guía paso a paso para migrar el sistema a un servidor
+  Ubuntu Server con Docker en producción.
 - `http://localhost:8000/docs`: documentación interactiva de la API generada
   automáticamente por FastAPI.
