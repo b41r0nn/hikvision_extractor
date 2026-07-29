@@ -503,6 +503,11 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   - Backend sin `--reload`.
   - Frontend en puerto `80`, backend en puerto `8000`.
   - Red bridge explícita y healthchecks para `db` y `backend`.
+  - Healthcheck del backend apunta a `GET /health` (sin autenticación), no a `/api/status` que requiere JWT.
+- Se agregó `GET /health` en `backend/main.py`:
+  - Sin autenticación ni RBAC.
+  - Ejecuta `SELECT 1` contra PostgreSQL mediante `engine.connect()`.
+  - Devuelve `200 {"status": "ok"}` si la conexión funciona; `500` si falla.
 - Se creó `MIGRACION_UBUNTU.md` con el procedimiento completo aprobado:
   1. Requisitos previos e instalación de Docker.
   2. Empaquetado del código en Windows con exclusiones de seguridad.
@@ -534,6 +539,20 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
   `configuracion_correo`; de lo contrario, reconfigurar SMTP.
 - `POSTGRES_PASSWORD` y `ADMIN_PASSWORD`: contraseñas fuertes.
 - `DEVICE_IP`, `DEVICE_USER`, `DEVICE_PASS`: credenciales reales del biométrico.
+
+**Evidencia de verificación (29 de julio de 2026):**
+- `test_evidencia/logs/test_health_endpoint_20260729.txt`:
+  - `GET /health` devuelve `200 {"status": "ok"}` sin autenticación.
+  - `GET /api/status` sin token devuelve `401`, confirmando que el healthcheck
+    anterior estaba mal targeteado.
+- `test_evidencia/logs/test_fernet_key_migracion_20260729.txt`:
+  - Con la `FERNET_KEY` original se desencripta el password migrado correctamente.
+  - Con una `FERNET_KEY` regenerada falla con `InvalidToken`, demostrando el riesgo
+    silencioso que la guía ahora detecta en el paso de verificación post-restore.
+- **Nota sobre build Docker local:** el daemon de Docker Desktop no está corriendo
+  en este entorno, por lo que no se pudo ejecutar `docker compose up` real. El
+  healthcheck fue verificado contra la app importada con `TestClient`; el endpoint
+  real y el compose de producción quedan listos para validar en el servidor Ubuntu.
 
 **Preguntas pendientes para resolver antes del deploy real:**
 1. ¿Cuál será la IP fija del servidor Ubuntu?

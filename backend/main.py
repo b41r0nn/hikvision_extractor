@@ -14,6 +14,7 @@ from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from . import models
@@ -349,6 +350,20 @@ class PeriodicidadRequest(BaseModel):
 @app.get("/")
 def read_root():
     return {"message": "API de Asistencia Biométrica REDIHOS — en línea"}
+
+
+@app.get("/health")
+def health_check():
+    """
+    Endpoint de salud para healthchecks de Docker/orquestadores.
+    No requiere autenticación ni RBAC. Verifica conectividad a PostgreSQL.
+    """
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        return {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database connection failed: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -192,35 +192,76 @@ Variables que **deben** cambiarse obligatoriamente:
 | --- | --- |
 | `POSTGRES_PASSWORD` | Contraseña fuerte para PostgreSQL. |
 | `DATABASE_URL` | Debe usar el servicio `db`: `postgresql://admin:<POSTGRES_PASSWORD>@db:5432/hikvision` |
-| `FERNET_KEY` | Clave Fernet para desencriptar la contraseña SMTP (ver nota más abajo). |
+| `FERNET_KEY` | **Ver paso obligatorio más abajo.** Clave Fernet para desencriptar la contraseña SMTP. |
 | `SECRET_KEY` | Clave para firmar JWT. Generar una nueva en producción. |
 | `ADMIN_PASSWORD` | Contraseña temporal del usuario admin inicial. |
 | `DEVICE_IP` | IP que Ubuntu ve del biométrico Hikvision. |
 | `DEVICE_USER` | Usuario del biométrico. |
 | `DEVICE_PASS` | Contraseña del biométrico. |
 
-> **Nota sobre `FERNET_KEY`:** si se restaura un backup que incluye la tabla
-> `configuracion_correo`, copiar el `FERNET_KEY` del `.env` de desarrollo.
-> Si el backup no incluye datos de correo o se prefiere empezar de cero,
-> generar una nueva clave en el paso 8 y luego configurar el SMTP desde el
-> panel Admin.
+### Paso obligatorio: decidir `FERNET_KEY` antes de generar nada
+
+La `FERNET_KEY` es la clave maestra que protege la contraseña SMTP guardada en
+la tabla `configuracion_correo`. **No generar una nueva automáticamente sin leer
+este paso.**
+
+Antes de restaurar el backup, ejecutar en el servidor Ubuntu:
+
+```bash
+# Buscar si el backup contiene filas en configuracion_correo
+grep -i "configuracion_correo" /opt/backup_hikvision.sql | head -5
+```
+
+**Si el backup tiene datos en `configuracion_correo`:**
+
+1. **Obtener el `FERNET_KEY` del `.env` de desarrollo/original.** Es la única
+   clave que puede desencriptar el `password_encriptado` migrado.
+2. Copiar **exactamente ese valor** en el `.env` de producción.
+3. **No regenerar `FERNET_KEY`.** Si se regenera, el password SMTP quedará
+   indescifrable silenciosamente; el próximo envío de correo fallará sin un
+   mensaje claro durante el deploy.
+4. Después del restore, ejecutar obligatoriamente la verificación del paso
+   **10.5 Verificar desencriptación de la configuración SMTP**.
+
+**Si el backup NO tiene datos en `configuracion_correo` (tabla vacía o no existe):**
+
+1. Generar una `FERNET_KEY` nueva en el paso 8.
+2. Configurar el SMTP desde el panel Admin después del deploy.
+
+> **Regla de oro:** la `FERNET_KEY` de producción debe ser **idéntica** a la
+> que encriptó los datos en origen. Si hay duda, copiarla del `.env` original.
+> Nunca inventar una nueva sobre datos migrados.
 
 ---
 
-## 8. Generar claves con `secrets.token_urlsafe(32)` y `Fernet.generate_key()`
+## 8. Generar claves
+
+### `SECRET_KEY` (siempre nuevo en producción)
 
 ```bash
-# SECRET_KEY para JWT
 python3 -c "import secrets; print(secrets.token_urlsafe(32))"
-
-# FERNET_KEY para la contraseña SMTP
-python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-Copiar los valores generados en el `.env`:
+Pegar el resultado en `.env`:
 
 ```env
 SECRET_KEY=<salida_de_secrets_token_urlsafe>
+```
+
+### `FERNET_KEY` (solo si el backup NO tiene `configuracion_correo`)
+
+Si el backup tiene datos de correo migrados, **omitir este comando** y usar la
+`FERNET_KEY` del `.env` original (paso 7).
+
+Si el backup no tiene datos de correo o se va a configurar SMTP desde cero:
+
+```bash
+python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Pegar el resultado en `.env`:
+
+```env
 FERNET_KEY=<salida_de_Fernet_generate_key>
 ```
 
@@ -260,6 +301,76 @@ Verificar que las tablas y datos existan:
 sudo docker compose -f docker-compose.prod.yml exec db psql -U admin -d hikvision -c "\dt"
 sudo docker compose -f docker-compose.prod.yml exec db psql -U admin -d hikvision -c "SELECT count(*) FROM empleados;"
 ```
+
+---
+
+## 10.5 Verificar desencriptación de la configuración SMTP (obligatorio si el backup tenía `configuracion_correo`)
+
+Este paso detecta **en el deploy** si la `FERNET_KEY` del `.env` de producción
+no coincide con la que encriptó el password SMTP del backup. Es mucho mejor
+fallar ahora que descubrir el problema a las 6:00 AM cuando el cron intente
+enviar el primer reporte.
+
+### Verificación rápida: ¿hay filas en `configuracion_correo`?
+
+```bash
+sudo docker compose -f docker-compose.prod.yml exec db psql -U admin -d hikvision -c "SELECT id, host, puerto, usuario, seguridad, password_encriptado IS NOT NULL as tiene_password FROM configuracion_correo;"
+```
+
+**Si la tabla está vacía:** no hay nada que verificar. Continuar con el paso 11.
+
+**Si la tabla tiene datos:** ejecutar el siguiente script de verificación.
+
+### Script de verificación de `FERNET_KEY`
+
+```bash
+cd /opt/hikvision_asistencia
+sudo docker compose -f docker-compose.prod.yml run --rm backend python - << 'PY'
+import os
+from backend.database import SessionLocal
+from backend import models
+from cryptography.fernet import Fernet, InvalidToken
+
+FERNET_KEY = os.getenv("FERNET_KEY")
+if not FERNET_KEY:
+    print("[ERROR] FERNET_KEY no está definida en el .env.")
+    raise SystemExit(1)
+
+db = SessionLocal()
+try:
+    config = db.query(models.ConfiguracionCorreo).first()
+    if not config or not config.password_encriptado:
+        print("[OK] No hay configuracion_correo con password encriptado. Nada que verificar.")
+        raise SystemExit(0)
+
+    try:
+        f = Fernet(FERNET_KEY.encode())
+        password = f.decrypt(config.password_encriptado.encode()).decode()
+        print(f"[OK] FERNET_KEY coincide. Password desencriptado correctamente para {config.usuario}.")
+        print(f"[OK] Longitud del password: {len(password)} caracteres.")
+    except InvalidToken:
+        print("[ERROR CRITICO] FERNET_KEY no puede desencriptar el password migrado.")
+        print("[ERROR CRITICO] Posibles causas:")
+        print("  1. Se regeneró FERNET_KEY en lugar de copiar la del .env original.")
+        print("  2. El backup se encriptó con otra FERNET_KEY.")
+        print("[ERROR CRITICO] Solución: obtener la FERNET_KEY correcta del .env de desarrollo")
+        print("                 o borrar la fila de configuracion_correo y reconfigurar SMTP.")
+        raise SystemExit(1)
+finally:
+    db.close()
+PY
+```
+
+Si el script devuelve `[ERROR CRITICO]`, **no continuar** con el deploy. Resolver
+una de estas dos opciones:
+
+1. **Opción recomendada:** obtener la `FERNET_KEY` correcta del `.env` original,
+   actualizar el `.env` de producción y volver a ejecutar el script.
+2. **Opción alternativa:** borrar la configuración SMTP migrada y reconfigurarla
+   desde el panel Admin con la nueva `FERNET_KEY`:
+   ```bash
+   sudo docker compose -f docker-compose.prod.yml exec db psql -U admin -d hikvision -c "DELETE FROM configuracion_correo;"
+   ```
 
 ---
 
