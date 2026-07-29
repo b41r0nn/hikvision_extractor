@@ -56,6 +56,8 @@ roles, permisos y configuración de correo desde una interfaz web.
 ├── backend/
 │   ├── auth.py                     # JWT, Argon2id, RBAC
 │   ├── config_service.py           # Configuración persistente y alertas
+│   ├── config_correo_service.py    # Configuración SMTP encriptada (Fernet)
+│   ├── crypto_service.py           # Encriptación simétrica con Fernet
 │   ├── database.py                 # Conexión SQLAlchemy + SessionLocal
 │   ├── email_service.py            # Envío SMTP de reportes
 │   ├── main.py                     # API FastAPI y lifespan
@@ -114,6 +116,7 @@ proceso falla al arrancar.
 | `festivos` | Festivos colombianos poblados automáticamente por `holidays`. |
 | `registros_asistencia` | Cada marca de entrada/salida extraída del biométrico. |
 | `configuracion` | Clave-valor persistente: destinatarios de correo, periodicidad, última extracción, alertas. |
+| `configuracion_correo` | Fila única con la configuración SMTP encriptada (host, puerto, usuario, password, seguridad). |
 | `permisos` | Lista canónica de permisos del sistema (ej. `ver_dashboard`, `admin_roles`). |
 | `roles` | Roles definidos por el administrador. |
 | `rol_permiso` | Relación muchos-a-muchos entre roles y permisos. |
@@ -232,12 +235,16 @@ Abstrae la tabla `Configuracion` como clave-valor:
 
 ### 4.8 `backend/email_service.py` — Envío de correos
 
-- Lee `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_APP_PASSWORD` del `.env`.
+- Lee la configuración SMTP desde la tabla `configuracion_correo`
+  (`config_correo_service.get_config_desencriptada`). La contraseña se
+  almacena encriptada con Fernet usando `FERNET_KEY` del `.env`.
 - Lee destinatarios desde la base de datos (`config_service.get_recipients`).
 - `enviar_reporte_semanal`: semana laboral pasada (lunes a viernes).
 - `enviar_reporte_mensual`: mes anterior completo.
-- `enviar_correo_prueba`: envía un correo sin adjunto para verificar SMTP.
+- `enviar_correo_prueba_a`: envía un correo de prueba a una dirección específica.
 - Adjunta el Excel generado por `report_service.generar_reporte`.
+- Si no hay configuración de correo guardada, los jobs loguean un mensaje claro
+  en lugar de intentar conectar con credenciales vacías.
 
 ### 4.9 `backend/report_service.py` — Motor de Excel y tardanzas
 
@@ -360,10 +367,15 @@ Puede ejecutarse como script independiente o ser llamado desde el backend.
 
 ### 5.7 Reportes automáticos por correo
 
-- `email_service` genera el Excel del período y lo envía a los destinatarios
-  configurados en la base de datos.
+- El admin configura el servidor SMTP (host, puerto, usuario, contraseña,
+  seguridad) desde el panel Admin; la contraseña se guarda encriptada en
+  `configuracion_correo`.
+- `email_service` lee la configuración desde la BD, genera el Excel del período
+  y lo envía a los destinatarios configurados.
 - La periodicidad se edita desde el panel admin y se reprograma en caliente
   llamando `scheduler.reschedule_report_jobs()`.
+- Si la tabla `configuracion_correo` está vacía, los jobs de reportes loguean
+  "Correo no configurado" y no intentan conectar.
 
 ---
 
@@ -417,6 +429,11 @@ Todas las credenciales viven en el archivo `.env` y **nunca están hardcodeadas
 en el código**. El repositorio incluye `.env.example` y `.gitignore` ignora el
 `.env` real.
 
+- La contraseña SMTP se guarda encriptada en la base de datos mediante Fernet;
+  la clave maestra (`FERNET_KEY`) es la única pieza que permanece en `.env`.
+- Si `FERNET_KEY` o `DATABASE_URL` no están configuradas, el backend falla al
+  arrancar con un mensaje claro (fail-loud).
+
 ### 7.2 JWT
 
 - `SECRET_KEY` firma los tokens. En producción debe generarse con:
@@ -459,10 +476,11 @@ Copiar `.env.example` a `.env` y completar los valores reales.
 | `DEVICE_USER` | `admin` | Usuario del biométrico. |
 | `DEVICE_PASS` | `tu_password` | Contraseña del biométrico. |
 | `BACKFILL_TIMEOUT_SEC` | `3600` | Techo duro en segundos para el backfill de arranque. |
-| `SMTP_HOST` | `smtp.gmail.com` | Servidor SMTP. |
-| `SMTP_PORT` | `587` | Puerto SMTP. |
-| `SMTP_USER` | `tu_correo@gmail.com` | Cuenta de correo. |
-| `SMTP_APP_PASSWORD` | `xxxxxxxxxxxxxxxx` | Contraseña de aplicación de 16 caracteres. |
+| `FERNET_KEY` | `<tu_fernet_key>` | Clave para encriptar la contraseña SMTP en reposo. Generar con `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
+| `SMTP_HOST` | `smtp.gmail.com` | **DEPRECADO** — ahora se configura en el panel Admin. |
+| `SMTP_PORT` | `587` | **DEPRECADO** — ahora se configura en el panel Admin. |
+| `SMTP_USER` | `tu_correo@gmail.com` | **DEPRECADO** — ahora se configura en el panel Admin. |
+| `SMTP_APP_PASSWORD` | `xxxxxxxxxxxxxxxx` | **DEPRECADO** — ahora se guarda encriptado en la BD. |
 | `REPORT_RECIPIENTS` | `rrhh@redihos.com` | Destinatarios iniciales de reportes automáticos. |
 | `DEFAULT_TURNO_ENTRADA` | `07:30` | **DEPRECADO** en Fase A. Ya no se usa; todo empleado debe tener turno_id real. |
 | `DEFAULT_TOLERANCIA_MINUTOS` | `10` | **DEPRECADO** en Fase A. Ya no se usa; el horario se lee desde `turno_horario`. |
@@ -674,8 +692,9 @@ docker compose exec backend alembic upgrade head
   panel "Marcas sin asociar" y no se incluyen en KPIs ni reportes.
 - El panel de festivos es de solo lectura; los festivos se recargan desde la
   librería `holidays` en cada arranque.
-- Para que los reportes automáticos funcionen se debe configurar una cuenta
-  Gmail con contraseña de aplicación y al menos un destinatario.
+- Para que los reportes automáticos funcionen se debe configurar el servidor
+  SMTP, usuario y contraseña desde el panel Admin, y al menos un destinatario.
+  Es agnóstico del proveedor (Gmail, Outlook, servidor propio, etc.).
 - El contenedor `backend` usa `restart: always`; si el watchdog mata el proceso
   por timeout de backfill, Docker lo levanta de nuevo.
 
@@ -686,9 +705,10 @@ docker compose exec backend alembic upgrade head
 1. Cambiar `ADMIN_PASSWORD` en `.env` y resetear el usuario admin contra la
    base de datos PostgreSQL real.
 2. Generar un `SECRET_KEY` real y reemplazarlo en `.env`.
-3. Configurar credenciales SMTP reales y un destinatario.
-4. Cargar/verificar los empleados reales de REDIHOS en la tabla `empleados`.
-5. Realizar una validación visual del frontend en navegador.
+3. Generar un `FERNET_KEY` real y guardarlo en `.env`.
+4. Configurar credenciales SMTP reales desde el panel Admin y un destinatario.
+5. Cargar/verificar los empleados reales de REDIHOS en la tabla `empleados`.
+6. Realizar una validación visual del frontend en navegador.
 
 ---
 
