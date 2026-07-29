@@ -456,6 +456,30 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 - **`update_empleado` con clientes viejos:** queda pendiente confirmar si un cliente con caché de browser que envíe `hora_entrada`/`tolerancia_minutos` en el PUT debe ser ignorado silenciosamente o rechazado. Actualmente el endpoint simplemente no lee esos campos.
 - **Columnas deprecadas:** `hora_entrada`/`tolerancia_minutos` de `Turno` y `Empleado` siguen existiendo en el schema pero sin uso. Anotar como candidatas a limpieza en migración futura, no ahora.
 
+### 8.11 Configuración SMTP editable desde Admin (29 de julio de 2026)
+
+**Commit:** `576c38f`
+
+**Cambios:**
+- Nueva tabla `configuracion_correo` con fila única (`id = 1`) y constraint `CHECK (id = 1)`.
+- Campo `password_encriptado` con Fernet; `FERNET_KEY` en `.env` requerida; falla ruidosa si falta.
+- Nuevos endpoints bajo `admin_correo`:
+  - `GET /api/config/correo` — devuelve host, puerto, usuario, remitente, seguridad, `password_configurado` y metadatos; nunca el password.
+  - `PUT /api/config/correo` — guarda/actualiza; password vacío/null no pisa el existente.
+  - `POST /api/config/correo/test` — envía correo de prueba real a una dirección ingresada; devuelve error SMTP real si falla.
+- `email_service.py` lee la configuración desde la BD y soporta `none`, `starttls` y `ssl`. Si no hay config, los jobs loguean "correo no configurado" en lugar de conectar con credenciales vacías.
+- Variables `SMTP_USER`/`SMTP_APP_PASSWORD` en `.env.example` marcadas como deprecadas.
+- Panel Admin: formulario SMTP con host, puerto, usuario, contraseña (placeholder vacío = no cambiar), nombre remitente, seguridad; botón de correo de prueba con feedback; metadatos de última actualización.
+- Footer del sidebar con crédito discreto: "Diseñado por Bairon Calle Rivera — b41r0nn@gmail.com".
+
+**Evidencia:**
+- `test_evidencia/logs/test_config_correo_console.txt`:
+  - encriptación/desencriptación OK y password no almacenado en claro en BD;
+  - `GET /api/config/correo` no devuelve password;
+  - `PUT` con password vacío no pisa el password existente;
+  - upgrade/downgrade/upgrade de la migración `f3321bd4c48b` OK.
+- `test_evidencia/screenshot_footer_creditos.png` (footer con crédito, captura local con Playwright).
+
 ## 9. Problemas actuales / bloqueantes abiertos
 
 | # | Problema | Impacto | Owner | Estado |
@@ -463,7 +487,7 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 | 1 | `ADMIN_PASSWORD` del `.env` de producción aún no se ha cambiado ni reseteado en PostgreSQL real | Riesgo de acceso con credencial por defecto | Usuario | Pendiente (#4.1) |
 | 2 | `SECRET_KEY` de producción no generado | Tokens JWT firmados con valor de ejemplo/documentación | Usuario | Pendiente |
 | 3 | Deploy a producción no realizado | Sistema aún no corre en Docker real | Usuario | Pendiente |
-| 4 | Cuenta SMTP/Gmail no configurada | Reportes automáticos por correo no funcionan | Usuario | Post-deploy |
+| 4 | Cuenta SMTP no configurada en BD | Reportes automáticos por correo no funcionan hasta que el admin complete el formulario en el panel | Usuario | Post-deploy |
 | 5 | Validación visual del frontend en navegador | UI no verificada gráficamente | Usuario | Post-deploy |
 | 6 | Registro manual de empleados en tabla `Empleado` | 36 nombres del biométrico aún sin asociar; reportes los muestran sin nombre | Usuario | Post-deploy |
 | 7 | Buffer overflow en backfill de rangos grandes | **Mitigado por diseño**: procesamiento día por día con `fetch_day()` + `BATCH_SIZE=50` + `_device_lock` + watchdog 1h | Cerrado | No requiere acción |
