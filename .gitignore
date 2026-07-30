@@ -10,3 +10,6 @@ __pycache__/
 
 # Evidencia local de pruebas (BD SQLite + logs + scripts de test)
 test_evidencia/
+
+# Backups locales
+backups/
