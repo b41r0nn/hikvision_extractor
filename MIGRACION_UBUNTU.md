@@ -236,6 +236,14 @@ grep -i "configuracion_correo" /opt/backup_hikvision.sql | head -5
 
 ## 8. Generar claves
 
+> **Nota obligatoria sobre el nombre del archivo:** `docker-compose.prod.yml`
+> tiene `env_file: .env` hardcodeado en los servicios `db` y `backend`. Por
+> diseño, **el archivo final debe llamarse exactamente `.env`** en la raíz del
+> proyecto. No usar `.env.prod`, `.env.production` ni ningún otro nombre; el
+> compose de producción no lo aceptará, incluso si se pasa `--env-file` en la
+> CLI (ese flag solo sustituye variables `${...}` en el YAML, no cambia el
+> `env_file` declarado en cada servicio).
+
 ### `SECRET_KEY` (siempre nuevo en producción)
 
 ```bash
