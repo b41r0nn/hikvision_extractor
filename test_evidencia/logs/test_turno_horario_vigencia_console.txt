@@ -1,0 +1,10 @@
+[2026-07-28 08:17:52] Inicio de pruebas de versionado de horarios
+[2026-07-28 08:17:52] Turno creado: id=1
+[2026-07-28 08:17:52] Horarios insertados: lunes con 2 vigencias, martes-viernes con vigencia base
+[2026-07-28 08:17:52] TEST 1: lunes 2026-07-27 (antes de vigencia) -> hora=07:30:00, tolerancia=10
+[2026-07-28 08:17:52] TEST 2: lunes 2026-08-10 (despues de vigencia) -> hora=08:00:00, tolerancia=10
+[2026-07-28 08:17:52] TEST 3: martes 2026-08-04 -> hora=07:30:00, tolerancia=10
+[2026-07-28 08:17:52] TEST 4: OK -> HorarioNoConfiguradoError lanzada: Turno 2 no tiene horario configurado para dia_semana=0 vigente desde 2026-08-04
+[2026-07-28 08:17:52] Todas las pruebas PASARON
+
+[RESULTADO] PASS

@@ -73,8 +73,11 @@ roles, permisos y configuración de correo desde una interfaz web.
 ├── generar_informe.py              # CLI para generar Excel desde PostgreSQL
 ├── migrate_csv.py                  # CLI para migrar CSV de iVMS-4200 a PostgreSQL
 ├── docker-compose.yml              # Orquestación de los 3 servicios
+├── docker-compose.prod.yml         # Orquestación de producción
 ├── backend.Dockerfile              # Imagen del backend
 ├── frontend.Dockerfile             # Imagen del frontend
+├── backup.ps1                      # Backup manual/automático en Windows (PowerShell)
+├── backup.sh                       # Backup manual/automático en Linux/WSL
 ├── .env.example                    # Variables de entorno documentadas
 ├── requirements.txt                # Dependencias Python
 ├── handoff_hikvision_asistencia.md # Notas internas de handoff
@@ -209,7 +212,7 @@ Usa `BackgroundScheduler` de APScheduler con los siguientes jobs:
 | Job | Horario | Función |
 | --- | --- | --- |
 | `sync_empleados_diaria` | 7:00 AM | Sincroniza empleados enrolados desde el biométrico. |
-| `extraccion_diaria` | 8:00 PM | Extrae las marcaciones del día. |
+| `extraccion_periodica` | 6:00 AM - 8:00 PM (cada hora) | Extrae las marcaciones del día en horario laboral. |
 | `reporte_semanal` | Configurable | Envía por correo el informe de la semana pasada. |
 | `reporte_mensual` | Configurable | Envía por correo el informe del mes anterior. |
 
@@ -292,9 +295,10 @@ Puede ejecutarse como script independiente o ser llamado desde el backend.
 - `BATCH_SIZE=50` para el endpoint de eventos.
 - Cada llamada usa un `searchID` UUID nuevo para evitar que el dispositivo
   pise resultados entre paginaciones.
-- Un `threading.Lock` global `_device_lock` serializa todas las llamadas al
-  dispositivo, evitando condiciones de carrera entre job programado, extracción
-  manual y sync de empleados.
+- Un `threading.Lock` global (`backend/device_lock.py`) serializa **todas** las
+  llamadas HTTP al dispositivo, tanto de extracción de marcas (`extractor_hikvision.py`)
+  como de sincronización de empleados (`backend/sync_empleados.py`). Evita
+  condiciones de carrera entre job programado, extracción manual y sync de empleados.
 - Si la primera consulta de 24h devuelve menos eventos que `totalMatches`,
   divide el día en AM/PM. Si alguna mitad sigue truncada, divide en Q1-Q4.
 - Filtra eventos de autenticación de personas: `Fingerprint Recognition Passed`,
@@ -674,6 +678,57 @@ Luego conectate como si fuera `localhost`.
 docker compose exec backend alembic upgrade head
 ```
 
+### 10.7 Backup y restauración local
+
+El repositorio incluye dos scripts de backup que siempre sobrescriben el mismo
+archivo, manteniendo solo la última copia:
+
+- `backup.ps1` — para Windows/PowerShell.
+- `backup.sh` — para Linux/WSL/bash.
+
+Ambos generan en la carpeta `backups/`:
+
+- `hikvision_latest.sql` — dump de PostgreSQL.
+- `.env.backup` — copia del archivo `.env`.
+- `backup.log` — log de ejecuciones.
+
+#### Backup manual
+
+**Windows (PowerShell):**
+
+```powershell
+powershell -ExecutionPolicy Bypass -File backup.ps1
+```
+
+**Linux/WSL:**
+
+```bash
+bash backup.sh
+```
+
+#### Backup automático
+
+- **Windows:** usar el Programador de tareas para ejecutar `backup.ps1` todos
+  los días a la hora deseada (ej. 8:00 AM).
+- **Linux/WSL:** agregar una línea a `crontab -e`:
+
+  ```cron
+  0 8 * * * /ruta/al/proyecto/backup.sh >> /ruta/al/proyecto/backups/backup.log 2>&1
+  ```
+
+#### Restaurar desde el backup
+
+```bash
+# Restaurar la base de datos
+docker compose exec -T db psql -U admin -d hikvision < backups/hikvision_latest.sql
+
+# Restaurar el .env
+cp backups/.env.backup .env
+```
+
+> La carpeta `backups/` está en `.gitignore` para evitar subir secretos o datos
+> al repositorio.
+
 ---
 
 ## 11. Buenas prácticas aplicadas
@@ -685,8 +740,9 @@ docker compose exec backend alembic upgrade head
   `backend/timezone.py`.
 - **RBAC granular**: permisos almacenados en base de datos; endpoints protegidos.
 - **Hashes seguros**: Argon2id para contraseñas.
-- **Serialización del acceso al biométrico**: `_device_lock` evita extracciones
-  concurrentes que corrompan la paginación.
+- **Serialización del acceso al biométrico**: `device_lock` (`backend/device_lock.py`)
+  evita llamadas HTTP concurrentes al biométrico, ya sea por extracción de marcas
+  o sincronización de empleados.
 - **Idempotencia**: el extractor deduplica por empleado/fecha/hora; la
   sincronización de empleados no elimina; `init_rbac` puede ejecutarse en cada
   arranque.

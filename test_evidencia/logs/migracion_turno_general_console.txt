@@ -1,0 +1,24 @@
+[2026-07-28 13:00:40] ============================================================
+[2026-07-28 13:00:40] INICIO migracion_turno_general.py
+[2026-07-28 13:00:40] DATABASE_URL=postgresql://admin:adminpassword@db:5432/hikvision
+[2026-07-28 13:00:40] VIGENTE_NUEVA=2026-07-28
+[2026-07-28 13:00:40] ============================================================
+[2026-07-28 13:00:40] BEGIN transaccion
+[2026-07-28 13:00:40] PASO 1: Creado turno 'Turno General' con id=1
+[2026-07-28 13:00:40] PASO 2: Insertadas 5 filas base en turno_horario (vigente_desde=2020-01-01)
+[2026-07-28 13:00:40] PASO 3: Insertadas 5 filas nuevas en turno_horario (vigente_desde=2026-07-28)
+[2026-07-28 13:00:40] PASO 4: Empleados con turno_id IS NULL antes del UPDATE: 71
+[2026-07-28 13:00:40] PASO 4: UPDATE ejecutado
+[2026-07-28 13:00:40] PASO 5: Inician verificaciones
+[2026-07-28 13:00:40]   CHECK 1: empleados con turno_id IS NULL = 0 (esperado 0)
+[2026-07-28 13:00:40]   CHECK 2: filas turno_horario para turno_id=1 = 10 (esperado 10)
+[2026-07-28 13:00:40]   CHECK 3: lunes 2026-07-28 -> hora=08:00:00 tolerancia=1 (esperado 08:00, 1)
+[2026-07-28 13:00:40]   CHECK 4: martes 2026-07-28 -> hora=07:30:00 tolerancia=1 (esperado 07:30, 1)
+[2026-07-28 13:00:40]   CHECK 5: lunes 2020-06-01 -> hora=07:30:00 tolerancia=10 (esperado 07:30, 10)
+[2026-07-28 13:00:40] COMMIT exitoso
+[2026-07-28 13:00:40] ============================================================
+[2026-07-28 13:00:40] MIGRACION COMPLETADA
+[2026-07-28 13:00:40]   turno_id=1 'Turno General'
+[2026-07-28 13:00:40]   empleados actualizados=71
+[2026-07-28 13:00:40] ============================================================
+[2026-07-28 13:00:40] [RESULTADO] PASS

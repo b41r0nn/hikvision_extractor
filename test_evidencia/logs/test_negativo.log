@@ -1,0 +1,22 @@
+Aplicando migraciones de Alembic...
+[MIGRACIONES] Alembic upgrade head aplicado correctamente.
+Iniciando inicialización de datos...
+[FESTIVOS] 0 festivos poblados desde la librería holidays.
+[RBAC] Roles y permisos inicializados.
+[CONFIG] Configuración por defecto inicializada.
+[BACKFILL] Rellenando desde 2026-07-22 hasta 2026-07-24...
+Iniciando scheduler de tareas en segundo plano...==================================================
+Modo       : GUARDAR EN BASE DE DATOS
+Desde      : 2026-07-22
+Hasta      : 2026-07-24
+==================================================
+
+[BACKFILL] Conectando al dispositivo para extraer desde 2026-07-22 hasta 2026-07-24...
+
+Procesando 2026-07-22...
+[BACKFILL] Procesando 2026-07-22...
+[SCHEDULER] Scheduler iniciado. Jobs: sync_empleados_diaria, extraccion_diaria, reporte_semanal, reporte_mensual.
+  [ERROR] 2026-07-22: Timeout conectando a 192.168.255.1: HTTPConnectionPool(host='192.168.255.1', port=80): Read timed out. (read timeout=15) -> deteniendo bucle
+[BACKFILL]   [ERROR] 2026-07-22: Timeout conectando a 192.168.255.1: HTTPConnectionPool(host='192.168.255.1', port=80): Read timed out. (read timeout=15) -> deteniendo bucle
+[BACKFILL ABORTADO] Timeout conectando a 192.168.255.1: HTTPConnectionPool(host='192.168.255.1', port=80): Read timed out. (read timeout=15)
+[BACKFILL] ultima_extraccion_exitosa NO se actualiza; se reintentara en el proximo arranque.

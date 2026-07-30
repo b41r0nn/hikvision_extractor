@@ -3,8 +3,8 @@
 **Empresa:** REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S (REDIHOS)  
 **Fase:** 3 — Servicio web con PostgreSQL, dashboard, reportes automáticos y panel de administración  
 **Stack:** FastAPI + Uvicorn + PostgreSQL + Nginx + APScheduler + Docker  
-**Última actualización:** 29 de julio de 2026  
-**Estado:** Feature `v1.2-smtp-admin` lista para deploy. Guía de migración a Ubuntu Server (`MIGRACION_UBUNTU.md`) y `docker-compose.prod.yml` creados. Pendientes reales antes del deploy: definir IP fija del servidor, dominio DNS exacto, proveedor SMTP y generar/confirmar credenciales de producción (`SECRET_KEY`, `FERNET_KEY`, `ADMIN_PASSWORD`, `POSTGRES_PASSWORD`).
+**Última actualización:** 30 de julio de 2026
+**Estado:** Feature `v1.2-smtp-admin` lista para deploy. Guía de migración a Ubuntu Server (`MIGRACION_UBUNTU.md`) y `docker-compose.prod.yml` creados. Backup automático local configurado (`backup.ps1`/`backup.sh`) para prevenir pérdida de datos y `.env`. Pendientes reales antes del deploy: definir IP fija del servidor, dominio DNS exacto, proveedor SMTP y generar/confirmar credenciales de producción (`SECRET_KEY`, `FERNET_KEY`, `ADMIN_PASSWORD`, `POSTGRES_PASSWORD`).
 
 ---
 
@@ -30,9 +30,12 @@
 | `generar_informe.py` | ✅ Funcional | CLI de reportes desde PostgreSQL. |
 | `migrate_csv.py` | ✅ Funcional | Migra CSV de iVMS-4200 a PostgreSQL, guarda `evento_raw`. |
 | `docker-compose.yml` | ✅ Funcional | Sin credenciales hardcodeadas. |
+| `docker-compose.prod.yml` | ✅ Funcional | Producción: sin bind mounts, PostgreSQL no expuesto, healthchecks. |
 | `.env.example` | ✅ Funcional | Documenta todas las variables necesarias. |
-| `.gitignore` | ✅ Creado | Excluye `.venv/`, `.env`, `__pycache__/`, etc. |
+| `.gitignore` | ✅ Creado | Excluye `.venv/`, `.env`, `__pycache__/`, `backups/`, etc. |
 | `README.md` | ✅ Actualizado | Refleja la arquitectura Fase 3. |
+| `backup.ps1` | ✅ Funcional | Backup de BD y `.env` para Windows/PowerShell. |
+| `backup.sh` | ✅ Funcional | Backup de BD y `.env` para Linux/WSL/bash. |
 
 ### 1.2 Eliminados en Fase 3
 
@@ -123,7 +126,25 @@
 - Al finalizar sin error, actualiza `ultima_extraccion_exitosa` con la hora actual UTC.
 - El job programado a las 8:00 PM se mantiene sin cambios.
 
-### 2.11 Alerta de extracción incompleta (`extraccion_incompleta_dias`)
+### 2.11 Backup automático local (30 de julio de 2026)
+
+- Se crearon `backup.ps1` (Windows) y `backup.sh` (Linux/WSL) para realizar un
+  backup diario de la base de datos PostgreSQL y del archivo `.env`.
+- Ambos scripts sobrescriben siempre el mismo archivo en `backups/`:
+  - `hikvision_latest.sql` — dump de PostgreSQL.
+  - `.env.backup` — copia del `.env`.
+- Se agregó la carpeta `backups/` a `.gitignore` para evitar filtrar datos
+  sensibles.
+- En Windows se configuró una tarea programada (`HikvisionBackupDiario`) que
+  ejecuta `backup.ps1` todos los días a las **08:00 AM**.
+- En Linux/WSL se puede usar `cron` con `backup.sh`.
+- Restauración:
+  ```bash
+  docker compose exec -T db psql -U admin -d hikvision < backups/hikvision_latest.sql
+  cp backups/.env.backup .env
+  ```
+
+### 2.12 Alerta de extracción incompleta (`extraccion_incompleta_dias`)
 
 - Cuando el dispositivo reporta `totalMatches` para un día pero la extracción (incluso con el fallback AM/PM/Q1-Q4) devuelve menos eventos, `config_service.add_alerta_extraccion(db, fecha, esperado, obtenido)` persiste el gap en la clave `extraccion_incompleta_dias` de la tabla `Configuracion` (JSON).
 - Se mantiene solo los últimos 14 días (`ALERTAS_MAX_RECIENTES`); si ya existe una alerta para la fecha, solo se actualiza cuando el nuevo gap es mayor.
@@ -257,7 +278,7 @@ Ejecución de extracción real `2026-07-21` a `2026-07-22`:
 - ✅ `misfire_grace_time=60` + test real de descarte.
 - ✅ Retomo del backfill desde el último día commiteado + `BACKFILL_TIMEOUT_SEC=3600`.
 - ✅ `create_usuario` fuerza `requiere_cambio_password=True`.
-- ✅ Lock de concurrencia `_device_lock` serializa 2 llamadas simultáneas.
+- ✅ Lock de concurrencia `device_lock` (`backend/device_lock.py`) serializa llamadas simultáneas al biométrico, incluyendo extracción y sync de empleados.
 - ✅ Buffer overflow / rangos grandes: cerrado por diseño (`main()` procesa día por día con `fetch_day()`).
 
 ### Post-deploy
@@ -331,20 +352,21 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 - **SECRET_KEY:** `.env.example` ahora documenta que el valor debe generarse con `python -c "import secrets; print(secrets.token_urlsafe(32))"` y no copiarse literalmente. Se generó un ejemplo real y se pegó como ilustración (no se aplicó al `.env` real de producción; eso lo hace el usuario a mano).
 - **Pendiente confirmado por el usuario:** #4.1 (cambio real de `ADMIN_PASSWORD` en producción y reset contra PostgreSQL) queda fuera del alcance de este entorno.
 
-### 8.5 Lock de concurrencia en `_device_lock` (27 de julio de 2026)
+### 8.5 Lock de concurrencia `device_lock` (27 de julio de 2026)
 
-- **Objetivo:** confirmar que `extractor_hikvision._device_lock` serializa dos llamadas simultáneas al dispositivo.
-- **Test:** `test_evidencia/test_device_lock_concurrency_20260727_2026.py` + `test_evidencia/logs/test_device_lock_concurrency_20260727_145811.log`.
+- **Objetivo:** confirmar que el lock global serializa dos llamadas simultáneas al dispositivo.
+- **Nota:** el lock original vivía en `extractor_hikvision.py` como `_device_lock`. En la ronda del 30 de julio de 2026 se movió a `backend/device_lock.py` como `device_lock` para compartirlo también con `backend/sync_empleados.py`.
+- **Test original:** `test_evidencia/test_device_lock_concurrency_20260727_2026.py` + `test_evidencia/logs/test_device_lock_concurrency_20260727_145811.log`.
   - Mock de `requests.post` para dormir 2s artificiales dentro del `fetch_range` real.
   - Dos threads llamaron `fetch_range()` casi simultáneamente.
   - Thread A entró al POST a las 14:58:12.583; thread B entró recién a las 14:58:14.584 (cuando A salió).
   - Tiempo total: **4.01s** (dos llamadas de 2s secuenciales, sin solapamiento).
-  - Resultado: **PASS**. `_device_lock` funciona correctamente.
+  - Resultado: **PASS**. El lock funciona correctamente.
 
 ### 8.6 Buffer overflow / rangos grandes de backfill (27 de julio de 2026)
 
 - **Estado:** Cerrado por diseño, sin prueba adicional.
-- **Razonamiento:** `extractor_hikvision.main()` itera día por día y llama `fetch_day()`, que a su vez llama `fetch_range()` con ventanas de 24h (con fallback AM/PM/Q1-Q4). Nunca carga el rango completo en memoria; el consumo de memoria por día está acotado por la paginación (`BATCH_SIZE=50`) y el lock `_device_lock` serializa las llamadas. El watchdog de 1h (`BACKFILL_TIMEOUT_SEC=3600`) cubre el gap práctico esperado (~1 semana); si se necesitara más, el backfill retoma desde el último día commiteado tras el reinicio del contenedor.
+- **Razonamiento:** `extractor_hikvision.main()` itera día por día y llama `fetch_day()`, que a su vez llama `fetch_range()` con ventanas de 24h (con fallback AM/PM/Q1-Q4). Nunca carga el rango completo en memoria; el consumo de memoria por día está acotado por la paginación (`BATCH_SIZE=50`) y el lock `device_lock` (`backend/device_lock.py`) serializa las llamadas HTTP al biométrico (extracción + sync de empleados). El watchdog de 1h (`BACKFILL_TIMEOUT_SEC=3600`) cubre el gap práctico esperado (~1 semana); si se necesitara más, el backfill retoma desde el último día commiteado tras el reinicio del contenedor.
 
 ---
 
@@ -561,6 +583,31 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 4. ¿Se quiere dejar listo un script de empaquetado automático para Windows
    (`build_deploy.ps1`)?
 
+### 8.13 Pérdida y recuperación de turnos/horarios (30 de julio de 2026)
+
+**Incidente:** durante una prueba local se perdió el `.env` original y se
+regeneró uno temporal. Tras ello, el backend reportó las tablas `turnos` y
+`turno_horario` vacías, aunque `empleados` seguía intacta con 71 registros.
+
+**Diagnóstico:**
+- El volumen `hikvision_extractor_pgdata` siguió siendo el mismo
+  (`Skipping initialization` en los logs de PostgreSQL).
+- La tabla `empleados` tenía 71 registros, lo que confirmó que no se había
+  inicializado una base de datos nueva.
+- Las tablas `turnos` y `turno_horario` estaban en 0, lo que indicó que esos
+  datos específicos se habían perdido (probablemente por un `TRUNCATE` o recreación
+  accidental de las tablas durante las pruebas).
+
+**Acción:**
+- Se recrearon manualmente los turnos y horarios en el panel Admin.
+- Se crearon los scripts de backup `backup.ps1` y `backup.sh` para evitar que
+  vuelva a pasar.
+- Se configuró una tarea programada en Windows que ejecuta el backup todos los
+  días a las 08:00 AM.
+- Se documentó la restauración en `README.md`.
+
+**Estado:** resuelto; sistema operativo con 5 turnos, 25 horarios y 71 empleados.
+
 ---
 
 ## 9. Problemas actuales / bloqueantes abiertos
@@ -573,10 +620,107 @@ El batch de cambios queda **cerrado**. Se validaron los 7 bloques propuestos y l
 | 4 | Cuenta SMTP no configurada en BD | Reportes automáticos por correo no funcionan hasta que el admin complete el formulario en el panel | Usuario | Post-deploy |
 | 5 | Validación visual del frontend en navegador | UI no verificada gráficamente | Usuario | Post-deploy |
 | 6 | Registro manual de empleados en tabla `Empleado` | 36 nombres del biométrico aún sin asociar; reportes los muestran sin nombre | Usuario | Post-deploy |
-| 7 | Buffer overflow en backfill de rangos grandes | **Mitigado por diseño**: procesamiento día por día con `fetch_day()` + `BATCH_SIZE=50` + `_device_lock` + watchdog 1h | Cerrado | No requiere acción |
+| 7 | Buffer overflow en backfill de rangos grandes | **Mitigado por diseño**: procesamiento día por día con `fetch_day()` + `BATCH_SIZE=50` + `device_lock` (`backend/device_lock.py`) + watchdog 1h | Cerrado | No requiere acción |
 
 ### Notas
 
 - Los ítems 1, 2 y 3 son **bloqueantes antes del deploy**.
 - Los ítems 4, 5 y 6 son **post-deploy**; no impiden que el sistema funcione, pero limitan funcionalidad.
 - El ítem 7 queda documentado como cerrado por diseño; no se hará prueba adicional.
+
+---
+
+## 8.14 Preparación de extracción periódica y lock compartido (30 de julio de 2026)
+
+**Objetivo:** cambiar la extracción automática de una vez al día (8:00 PM) a una
+vez por hora en horario laboral (6:00 AM - 8:00 PM), sin generar concurrencia
+entre sync de empleados (7:00 AM) y extracción de marcas.
+
+### Cambios implementados
+
+1. **Lock global compartido:**
+   - Se creó `backend/device_lock.py` con un `threading.Lock` global (`device_lock`).
+   - `extractor_hikvision.py` dejó de definir `_device_lock` local y ahora importa
+     `device_lock` desde `backend/device_lock`.
+   - `backend/sync_empleados.py` ahora también importa `device_lock` y envuelve la
+     llamada `session.post(...)` a `/ISAPI/AccessControl/UserInfo/Search` dentro del
+     lock.
+   - Resultado: cualquier llamada HTTP al biométrico (AcsEvent o UserInfo) está
+     serializada; nunca hay dos consultas simultáneas.
+
+2. **Reemplazo del job de extracción:**
+   - En `backend/scheduler.py` se eliminó el job `extraccion_diaria` (8:00 PM).
+   - Se agregó el job `extraccion_periodica` con cron `hour="6-20", minute=0`.
+   - Se renombró la función `tarea_extraccion_diaria()` a
+     `tarea_extraccion_periodica()` para reflejar el nuevo comportamiento.
+   - Se actualizó el mensaje de inicio del scheduler.
+
+### Evidencia de verificación
+
+- **Test cross-endpoint:** `test_evidencia/test_device_lock_cross_endpoint_20260730.py` +
+  `test_evidencia/logs/test_device_lock_cross_endpoint_20260730.txt`.
+  - Mock de `requests.Session.post` para dormir 2s dentro de cada llamada.
+  - Thread A ejecuta `extractor_hikvision.fetch_range()` (AcsEvent).
+  - Thread B ejecuta `sync_empleados._fetch_user_info_page()` (UserInfo).
+  - Ambos threads terminaron OK; el tiempo total fue ~5.9s, demostrando que las
+    llamadas no se solaparon y el lock serializó entre endpoints distintos.
+  - Resultado: **PASS**.
+
+- **Verificación de jobs:** `test_evidencia/logs/test_scheduler_jobs_20260730.txt`.
+  - Al iniciar el scheduler, los jobs registrados son:
+    - `extraccion_periodica` → `cron[hour='6-20', minute='0']`
+    - `sync_empleados_diaria` → `cron[hour='7', minute='0']`
+    - `reporte_mensual` → configurable
+    - `reporte_semanal` → configurable
+  - El job `extraccion_diaria` ya no aparece.
+
+- **Test de disparo controlado:** `test_evidencia/test_tarea_extraccion_periodica_20260730.py` +
+  `test_evidencia/logs/test_tarea_extraccion_periodica_20260730.txt`.
+  - Se ejecutó `tarea_extraccion_periodica()` directamente con `extractor_hikvision.main()` mockeado,
+    sin depender del reloj real y sin tocar el biométrico de producción.
+  - Se ejecutó 2 veces seguidas para simular un doble disparo del cron.
+  - Confirmaciones:
+    - La tarea loguea correctamente el disparo (`[EXTRACCION] Disparador: scheduler (cron hour=6-20, minute=0)`).
+    - `ultima_extraccion_exitosa` se actualizó en la BD de prueba en ambas ejecuciones.
+    - El timestamp de la segunda ejecución fue posterior a la primera.
+    - El doble disparo no generó errores ni duplicados.
+  - Resultado: **PASS**.
+
+### Estado de activación
+
+- Los cambios de código están en el repositorio.
+- **Aún NO se reinicia el backend de producción.** El cambio se activará en el
+  próximo deploy formal a Ubuntu, acompañado de monitoreo del primer disparo real
+  a las 6:00 AM.
+
+---
+
+## 10. Cierre de sprint v1.2-smtp-admin → prod-ready (30 de julio de 2026)
+
+**Estado:** Cerrado el sprint. Rama/lista de cambios lista para deploy a producción.
+
+### Listo para deploy
+
+- **Horario por día de semana + versionado histórico:** Turno 1 restaurado correctamente.
+- **SMTP configurable desde panel Admin:** contraseña encriptada con Fernet; host, puerto, usuario, remitente y seguridad editables en caliente.
+- **Seguridad:**
+  - Sin fallback silencioso.
+  - `/health` sin autenticación (healthcheck de producción).
+  - Contraseñas fuera de código y documentación.
+  - `ADMIN_PASSWORD` real cambiado.
+- **Compose de producción + guía Ubuntu de 21 pasos:** consistentes y revisados.
+- **Backup automatizado diario corriendo:** tarea programada `HikvisionBackupDiario` a las 08:00 AM en Windows; scripts `backup.ps1`/`backup.sh` disponibles.
+
+### Pendiente, fuera de este sprint — anotado, no bloqueante
+
+| Ítem | Detalle |
+| --- | --- |
+| SMTP real | Configurar proveedor (Gmail/Outlook/otro) y probar envío real desde el panel. Es lo próximo. |
+| Turnos 2-5 | Sin vigencia histórica. Sin impacto real: no hay data de producción todavía. |
+| Deuda técnica vieja | CORS abierto, tests automatizados, `update_empleado` con clientes viejos. |
+
+### Nota de cierre
+
+Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pérdida de turnos/horarios), pero se resolvió sin daño. El sistema queda operativo y el sprint cerrado hasta producción.
+
+Cuando se retome, sea para configurar el correo real o para arrancar el deploy real en Ubuntu, se sigue el mismo circuito de siempre.

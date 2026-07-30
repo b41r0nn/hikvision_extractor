@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "C:\Users\Sistemas\OneDrive - REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S REDIHOS\Escritorio\Vscode\hikvision_extractor\test_evidencia\run_with_timestamps.py", line 82, in <module>
+    main()
+  File "C:\Users\Sistemas\OneDrive - REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S REDIHOS\Escritorio\Vscode\hikvision_extractor\test_evidencia\run_with_timestamps.py", line 27, in main
+    log_file = open(log_path, "w", encoding="utf-8", buffering=1)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+PermissionError: [Errno 13] Permission denied: 'C:\\Users\\Sistemas\\OneDrive'

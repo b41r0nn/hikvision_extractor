@@ -1,0 +1,116 @@
+EVIDENCIA: Alcance del boton "Actualizar marcaciones" del dashboard
+Fecha: 29 de julio de 2026
+Proposito: investigar que rango de fechas extrae el boton "Actualizar
+marcaciones" del dashboard y si actualiza ultima_extraccion_exitosa.
+
+CODIGO RELEVANTE
+
+1. frontend/app.js:370-385 (funcion forzarExtraccion)
+
+    async function forzarExtraccion() {
+        const dStart = document.getElementById('date-start').value || hoy();
+        const dEnd   = document.getElementById('date-end').value   || hoy();
+        try {
+            const res = await apiFetch(`${API}/extraer`, {
+                method: 'POST',
+                body: { fecha_inicio: dStart, fecha_fin: dEnd }
+            });
+            if (!res.ok) { throw new Error((await res.json()).detail || 'Error'); }
+            const r = await res.json();
+            showToast(r.message, 'info');
+            document.getElementById('progress-bar').classList.add('visible');
+            document.getElementById('btn-extraer').disabled = true;
+            if (!pollingInterval) pollingInterval = setInterval(checkStatus, 1000);
+        } catch(e) { showToast(e.message || 'Error al contactar con la API', 'error'); }
+    }
+
+Conclusion: el boton lee los inputs `date-start` y `date-end` del dashboard. Si
+estan vacios, usa el dia de hoy. NO usa ultima_extraccion_exitosa para calcular
+un rango automatico.
+
+2. backend/main.py:623-634 (endpoint POST /api/extraer)
+
+    @app.post("/api/extraer")
+    def forzar_extraccion(
+        req: ExtraerRequest,
+        background_tasks: BackgroundTasks,
+        user: models.Usuario = Depends(require_perm("forzar_extraccion")),
+    ):
+        if extraction_state["is_running"]:
+            return {"message": "Ya hay una extraccion en curso."}
+        inicio = req.fecha_inicio or hoy_bogota().isoformat()
+        fin    = req.fecha_fin    or hoy_bogota().isoformat()
+        background_tasks.add_task(ejecutar_extraccion, inicio, fin)
+        return {"message": f"Extraccion iniciada ({inicio} -> {fin})."}
+
+Conclusion: el backend toma `fecha_inicio` y `fecha_fin` del frontend; si no
+vienen, default a hoy. No hay logica de backfill automatico.
+
+3. backend/main.py:182-202 (funcion ejecutar_extraccion)
+
+    def ejecutar_extraccion(start_date: str, end_date: str):
+        if extraction_state["is_running"]:
+            return
+        try:
+            extraction_state["is_running"] = True
+            extraction_state["progress"]   = f"Iniciando ({start_date} -> {end_date})..."
+            print(f"[EXTRACCION] Disparador: manual "
+                  f"(rango {start_date} -> {end_date})")
+            extractor_hikvision.main(start_str=start_date, end_str=end_date,
+                                      progress_callback=progress_callback)
+            db = SessionLocal()
+            try:
+                config_service.set_ultima_extraccion(db)
+            finally:
+                db.close()
+            extraction_state["progress"] = "Extraccion completada."
+        except extractor_hikvision.DeviceUnavailableError as e:
+            ...
+        except Exception as e:
+            ...
+        finally:
+            extraction_state["is_running"] = False
+
+Conclusion: `ejecutar_extraccion` ejecuta el rango recibido y, si completa sin
+error, actualiza `ultima_extraccion_exitosa` con la fecha/hora actual. Si falla
+(DeviceUnavailableError u otra), NO actualiza ultima_extraccion_exitosa.
+
+4. backend/scheduler.py:11-25 (job diario programado)
+
+    def tarea_extraccion_diaria():
+        extractor_hikvision.main()
+        db = SessionLocal()
+        try:
+            set_ultima_extraccion(db)
+        finally:
+            db.close()
+
+Conclusion: el job diario y el boton manual comparten el mismo mecanismo de
+actualizacion de ultima_extraccion_exitosa (`set_ultima_extraccion`). La
+diferencia es el rango: el job diario usa solo hoy, mientras que el boton usa
+los inputs del dashboard (default hoy).
+
+PRUEBA REALIZADA CON MOCK
+
+Se ejecuto un TestClient contra la app con extractor_hikvision.main mockeado:
+
+    with patch('extractor_hikvision.main') as mock_main:
+        mock_main.return_value = None
+        res = client.post('/api/extraer', 
+            json={'fecha_inicio': '2026-07-29', 'fecha_fin': '2026-07-29'},
+            headers={'Authorization': 'Bearer ' + token})
+
+Resultado:
+
+    POST /api/extraer status: 200
+    extractor_hikvision.main llamado con: call(start_str='2026-07-29', end_str='2026-07-29')
+    ultima_extraccion_exitosa despues: 2026-07-29T21:37:08.855837+00:00
+
+Conclusion:
+- El boton "Actualizar marcaciones" usa el rango de los inputs del dashboard,
+  no el rango de backfill (ultima+1 hasta hoy).
+- Si los inputs estan vacios, extrae solo hoy.
+- Al completar sin error, actualiza `ultima_extraccion_exitosa` exactamente igual
+  que el backfill automatico y el job diario.
+
+Resultado: investigacion cerrada.

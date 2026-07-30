@@ -1,0 +1,79 @@
+EVIDENCIA: FERNET_KEY debe coincidir con la del backup para desencriptar password SMTP
+Fecha: 29 de julio de 2026
+Proposito: demostrar que regenerar FERNET_KEY en produccion sobre un backup con
+configuracion_correo produce un error silencioso (InvalidToken) hasta el primer
+uso real del SMTP, y que la clave correcta desencripta el password migrado.
+
+Comando ejecutado:
+
+    .venv-test\Scripts\python.exe -c "
+    import os
+    from cryptography.fernet import Fernet, InvalidToken
+
+    # Simular FERNET_KEY original del .env de desarrollo
+    fernet_key_original = Fernet.generate_key().decode()
+    print('FERNET_KEY original:', fernet_key_original)
+
+    # Encriptar un password real (como se haria en desarrollo)
+    password_real = 'app_password_segura_2026'
+    fernet_original = Fernet(fernet_key_original.encode())
+    password_encriptado = fernet_original.encrypt(password_real.encode()).decode()
+    print('Password encriptado migrado:', password_encriptado)
+
+    # Simular escenario A: FERNET_KEY correcta en produccion
+    print()
+    print('=== Escenario A: FERNET_KEY correcta ===')
+    os.environ['FERNET_KEY'] = fernet_key_original
+    from cryptography.fernet import Fernet as Fernet2
+    fernet_prod = Fernet2(os.environ['FERNET_KEY'].encode())
+    try:
+        descifrado = fernet_prod.decrypt(password_encriptado.encode()).decode()
+        print('Password desencriptado OK:', descifrado)
+        assert descifrado == password_real
+        print('RESULTADO: PASS')
+    except InvalidToken:
+        print('RESULTADO: FAIL')
+        raise
+
+    # Simular escenario B: FERNET_KEY regenerada por error en produccion
+    print()
+    print('=== Escenario B: FERNET_KEY regenerada (error) ===')
+    fernet_key_nueva = Fernet.generate_key().decode()
+    print('FERNET_KEY nueva (incorrecta):', fernet_key_nueva)
+    os.environ['FERNET_KEY'] = fernet_key_nueva
+    fernet_prod2 = Fernet2(os.environ['FERNET_KEY'].encode())
+    try:
+        descifrado = fernet_prod2.decrypt(password_encriptado.encode()).decode()
+        print('Password desencriptado:', descifrado)
+        print('RESULTADO: PASS (inesperado)')
+    except InvalidToken:
+        print('ERROR CRITICO: InvalidToken - FERNET_KEY no coincide')
+        print('RESULTADO: FAIL (esperado, falla ruidosamente)')
+    "
+
+Salida:
+
+    FERNET_KEY original: msSg_yzNy22LkG2YUg0zm3cBVoaBYEVl_SWmgeLtNx0=
+    Password encriptado migrado: gAAAAABqam1G0NWJY0TdwsAs5pPImKOnjiRPob4A35KNRt3-wsMbTY_6qOZr7G6v_kkOWva-LDadhT-vpYVD9Uq-aNtaGgxmjNKGTfL4D2TMQZCPW6gTFi4=
+
+    === Escenario A: FERNET_KEY correcta ===
+    Password desencriptado OK: app_password_segura_2026
+    RESULTADO: PASS
+
+    === Escenario B: FERNET_KEY regenerada (error) ===
+    FERNET_KEY nueva (incorrecta): uWgBHXa6ygUgDPGJXlkt2yEmOgoCvkW2P2Q9ro6cIec=
+    ERROR CRITICO: InvalidToken - FERNET_KEY no coincide
+    RESULTADO: FAIL (esperado, falla ruidosamente)
+
+Conclusion:
+- La FERNET_KEY del .env de produccion debe ser IDENTICA a la del .env de
+  desarrollo/original cuando se migra un backup con datos en configuracion_correo.
+- Regenerarla silenciosamente corrompe el password almacenado; el error solo se
+  manifiesta en el momento de usar SMTP (ej. envio de reporte programado).
+- MIGRACION_UBUNTU.md fue actualizado para:
+  1. Marcar el paso de FERNET_KEY como OBLIGATORIO (no una nota al pie).
+  2. Incluir un script de verificacion post-restore que ejecuta un SELECT sobre
+     configuracion_correo y prueba desencriptar el password; si falla, aborta el
+     deploy con un mensaje explicito.
+
+Resultado: PASS (la clave correcta funciona; la clave incorrecta falla como se espera)

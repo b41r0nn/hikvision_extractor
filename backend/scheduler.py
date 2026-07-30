@@ -8,11 +8,11 @@ from .config_service import get_periodicidad, set_ultima_extraccion
 scheduler = BackgroundScheduler()
 
 
-def tarea_extraccion_diaria():
-    """Extrae eventos del día actual a las 8:00 PM."""
-    print("[SCHEDULER] Ejecutando extracción diaria programada...")
+def tarea_extraccion_periodica():
+    """Extrae eventos del día actual cada hora en horario laboral (6-20)."""
+    print("[SCHEDULER] Ejecutando extracción periódica programada...")
     try:
-        print("[EXTRACCION] Disparador: scheduler (cron hour=20, minute=0)")
+        print("[EXTRACCION] Disparador: scheduler (cron hour=6-20, minute=0)")
         extractor_hikvision.main()
         # Solo si la extracción fue exitosa, registramos el timestamp
         db = SessionLocal()
@@ -20,7 +20,7 @@ def tarea_extraccion_diaria():
             set_ultima_extraccion(db)
         finally:
             db.close()
-        print("[SCHEDULER] Extracción diaria completada y registrada.")
+        print("[SCHEDULER] Extracción periódica completada y registrada.")
     except Exception as e:
         print(f"[SCHEDULER ERROR] Extracción diaria: {e}")
 
@@ -114,12 +114,13 @@ def start_scheduler():
     # Sincronización de empleados a las 7:00 AM (antes del reporte semanal)
     scheduler.add_job(tarea_sync_empleados_diaria, "cron", hour=7, minute=0,
                       id="sync_empleados_diaria", **common)
-    # Extracción diaria a las 8:00 PM (L-D para no perder ningún día)
-    scheduler.add_job(tarea_extraccion_diaria, "cron", hour=20, minute=0,
-                      id="extraccion_diaria", **common)
+    # Extracción periódica en horario laboral: 6 AM a 8 PM, cada hora en punto.
+    # Reemplaza el job anterior de extracción diaria a las 8 PM.
+    scheduler.add_job(tarea_extraccion_periodica, "cron", hour="6-20", minute=0,
+                      id="extraccion_periodica", **common)
     # Reportes: leen periodicidad de la BD
     schedule_reporte_semanal()
     schedule_reporte_mensual()
     if not scheduler.running:
         scheduler.start()
-    print("[SCHEDULER] Scheduler iniciado. Jobs: sync_empleados_diaria, extraccion_diaria, reporte_semanal, reporte_mensual.")
+    print("[SCHEDULER] Scheduler iniciado. Jobs: sync_empleados_diaria, extraccion_periodica, reporte_semanal, reporte_mensual.")

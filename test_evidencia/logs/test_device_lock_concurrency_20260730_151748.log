@@ -1,0 +1,17 @@
+[2026-07-30T15:17:49.712149] [thread=30416] === test_device_lock_concurrency iniciado ===
+[2026-07-30T15:17:49.713150] [thread=30416] log_path = C:\Users\Sistemas\OneDrive - REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S REDIHOS\Escritorio\Vscode\hikvision_extractor\test_evidencia\logs\test_device_lock_concurrency_20260730_151748.log
+[2026-07-30T15:17:49.716185] [thread=30416] device_lock = <unlocked _thread.lock object at 0x000001DC4AE5D340>
+[2026-07-30T15:17:49.716185] [thread=30416] Simulacion: 2 threads llaman fetch_range() casi simultaneamente
+[2026-07-30T15:17:49.717146] [thread=30416] Esperado: thread A entra al POST, duerme 2s, sale; RECIEN thread B entra
+[2026-07-30T15:17:49.717146] [thread=30416] Si se solapan los DEVICE_CALL ENTER/EXIT -> el lock falla
+[2026-07-30T15:17:49.728792] [thread=24400] [A] START fetch_range
+[2026-07-30T15:17:49.729794] [thread=27040] [B] START fetch_range
+[2026-07-30T15:17:49.729794] [thread=24400] [DEVICE_CALL ENTER] http://192.168.1.127/ISAPI/AccessControl/AcsEvent?format=json
+[2026-07-30T15:17:51.732078] [thread=24400] [DEVICE_CALL EXIT]  http://192.168.1.127/ISAPI/AccessControl/AcsEvent?format=json
+[2026-07-30T15:17:51.733587] [thread=24400] [A] DONE fetch_range -> events=0, total=0
+[2026-07-30T15:17:51.733587] [thread=27040] [DEVICE_CALL ENTER] http://192.168.1.127/ISAPI/AccessControl/AcsEvent?format=json
+[2026-07-30T15:17:53.736463] [thread=27040] [DEVICE_CALL EXIT]  http://192.168.1.127/ISAPI/AccessControl/AcsEvent?format=json
+[2026-07-30T15:17:53.736463] [thread=27040] [B] DONE fetch_range -> events=0, total=0
+[2026-07-30T15:17:53.737525] [thread=30416] Tiempo total: 4.02s (esperado ~4s si el lock serializa)
+[2026-07-30T15:17:53.739484] [thread=30416] [RESULTADO] PASS: no se detecto solapamiento; lock serializo las llamadas
+[2026-07-30T15:17:53.740735] [thread=30416] === test_device_lock_concurrency finalizado ===

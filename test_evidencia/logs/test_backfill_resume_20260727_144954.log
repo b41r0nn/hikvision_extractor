@@ -1,0 +1,54 @@
+[2026-07-27T14:49:54.515592] === test_backfill_resume iniciado ===
+[2026-07-27T14:49:54.516595] log_path = C:\Users\Sistemas\OneDrive - REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S REDIHOS\Escritorio\Vscode\hikvision_extractor\test_evidencia\logs\test_backfill_resume_20260727_144954.log
+[2026-07-27T14:49:54.516595] db_path = C:\Users\Sistemas\OneDrive - REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S REDIHOS\Escritorio\Vscode\hikvision_extractor\test_evidencia\backfill_resume.db
+[2026-07-27T14:49:54.517593] Creando BD C:\Users\Sistemas\OneDrive - REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S REDIHOS\Escritorio\Vscode\hikvision_extractor\test_evidencia\backfill_resume.db
+[2026-07-27T14:49:59.236180] [SETUP] ultima_extraccion_exitosa = 2026-07-22T19:49:59.218854+00:00
+[2026-07-27T14:49:59.240179] [SETUP] BD lista. ultima=2026-07-22T19:49:59.218854+00:00, registros=0
+[2026-07-27T14:49:59.240179] [CONTROL] Lanzando uvicorn (mock backfill) en puerto 18003...
+[2026-07-27T14:49:59.380442] [CONTROL] PID primer arranque = 25104
+[2026-07-27T14:49:59.383574] [CONTROL] registros commiteados = 0
+[2026-07-27T14:50:01.387510] [CONTROL] registros commiteados = 0
+[2026-07-27T14:50:03.398893] [CONTROL] registros commiteados = 1
+[2026-07-27T14:50:05.400621] [CONTROL] registros commiteados = 1
+[2026-07-27T14:50:07.403461] [CONTROL] registros commiteados = 1
+[2026-07-27T14:50:09.405544] [CONTROL] registros commiteados = 1
+[2026-07-27T14:50:11.408088] [CONTROL] registros commiteados = 1
+[2026-07-27T14:50:13.415120] [CONTROL] registros commiteados = 2
+[2026-07-27T14:50:13.416148] [CONTROL] Llego a 2 dias commiteados? True
+[2026-07-27T14:50:13.416148] [CONTROL] Antes del kill: ultima=2026-07-24T00:00:00+00:00, registros=2
+[2026-07-27T14:50:13.417527] [CONTROL] Matando proceso 25104 (simula watchdog / kill -9)...
+[2026-07-27T14:50:13.418962] [UVICORN] INFO:     Started server process [15188]
+[2026-07-27T14:50:13.419974] [UVICORN] INFO:     Waiting for application startup.
+[2026-07-27T14:50:13.420487] [UVICORN] Aplicando migraciones de Alembic...
+[2026-07-27T14:50:13.422499] [UVICORN] INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+[2026-07-27T14:50:13.422499] [UVICORN] INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+[2026-07-27T14:50:13.422499] [UVICORN] [MIGRACIONES] Alembic upgrade head aplicado correctamente.
+[2026-07-27T14:50:13.425072] [CONTROL] Proceso muerto. ultima=2026-07-24T00:00:00+00:00, registros=2
+[2026-07-27T14:50:16.426774] [CONTROL] Lanzando uvicorn (mock backfill) en puerto 18003...
+[2026-07-27T14:50:16.462538] [CONTROL] PID segundo arranque = 22792
+[2026-07-27T14:50:16.466538] [CONTROL] registros commiteados = 2
+[2026-07-27T14:50:18.469471] [CONTROL] registros commiteados = 2
+[2026-07-27T14:50:20.479235] [CONTROL] registros commiteados = 3
+[2026-07-27T14:50:22.483764] [CONTROL] registros commiteados = 3
+[2026-07-27T14:50:24.488852] [CONTROL] registros commiteados = 3
+[2026-07-27T14:50:26.492670] [CONTROL] registros commiteados = 3
+[2026-07-27T14:50:28.494815] [CONTROL] registros commiteados = 3
+[2026-07-27T14:50:30.503138] [CONTROL] registros commiteados = 4
+[2026-07-27T14:50:32.504797] [CONTROL] registros commiteados = 4
+[2026-07-27T14:50:34.506400] [CONTROL] registros commiteados = 4
+[2026-07-27T14:50:36.510022] [CONTROL] registros commiteados = 4
+[2026-07-27T14:50:38.513501] [CONTROL] registros commiteados = 4
+[2026-07-27T14:50:40.526133] [CONTROL] registros commiteados = 5
+[2026-07-27T14:50:40.527162] [CONTROL] Llego a 5 dias commiteados? True
+[2026-07-27T14:50:40.529136] [CONTROL] Despues del reinicio: ultima=2026-07-27T00:00:00+00:00, registros=5
+[2026-07-27T14:50:45.532434] [CONTROL] Matando segundo proceso...
+[2026-07-27T14:50:45.534789] [UVICORN] INFO:     Started server process [13064]
+[2026-07-27T14:50:45.535815] [UVICORN] INFO:     Waiting for application startup.
+[2026-07-27T14:50:45.535815] [UVICORN] Aplicando migraciones de Alembic...
+[2026-07-27T14:50:45.537284] [UVICORN] INFO  [alembic.runtime.migration] Context impl SQLiteImpl.
+[2026-07-27T14:50:45.537792] [UVICORN] INFO  [alembic.runtime.migration] Will assume non-transactional DDL.
+[2026-07-27T14:50:45.537792] [UVICORN] [MIGRACIONES] Alembic upgrade head aplicado correctamente.
+[2026-07-27T14:50:45.540815] [VERIFICACION FINAL] ultima=2026-07-27T00:00:00+00:00, registros=5
+[2026-07-27T14:50:45.540815] [RESULTADO] PASS: Se completaron los 5 dias
+[2026-07-27T14:50:45.542588] [RESULTADO] PASS: ultima_extraccion_exitosa quedo en hoy
+[2026-07-27T14:50:45.543602] === test_backfill_resume finalizado ===

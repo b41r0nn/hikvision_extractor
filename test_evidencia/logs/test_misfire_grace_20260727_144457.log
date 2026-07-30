@@ -1,0 +1,15 @@
+[2026-07-27T14:44:57.138882] === test_misfire_grace iniciado ===
+[2026-07-27T14:44:57.138882] log_path = C:\Users\Sistemas\OneDrive - REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S REDIHOS\Escritorio\Vscode\hikvision_extractor\test_evidencia\logs\test_misfire_grace_20260727_144457.log
+[2026-07-27T14:44:57.139879] cwd = C:\Users\Sistemas\OneDrive - REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S REDIHOS\Escritorio\Vscode\hikvision_extractor
+[2026-07-27T14:44:57.139879] [CONFIG] misfire_grace_time=60, coalesce=True para ambos jobs
+[2026-07-27T14:44:57.139879] [SCHEDULE] job_missed_5min: run_date=2026-07-27T14:39:57.139879 (retraso esperado ~300s)
+[2026-07-27T14:44:57.141208] [SCHEDULE] job_in_grace_30sec: run_date=2026-07-27T14:44:27.139879 (retraso esperado ~30s)
+[2026-07-27T14:44:57.157361] [SCHEDULER] Starting...
+[2026-07-27T14:44:57.164369] [SCHEDULER] Started, waiting 10s for missed jobs to be processed...
+[2026-07-27T14:44:57.164369] [JOB RAN] job_in_grace_30sec
+[2026-07-27T14:45:07.165891] [SCHEDULER] Shutting down...
+[2026-07-27T14:45:07.165891] [SCHEDULER] Shutdown complete
+[2026-07-27T14:45:07.165891] [RESULTADO ESPERADO]
+[2026-07-27T14:45:07.167268]   job_missed_5min: NO debe haber corrido (retraso > 60s)
+[2026-07-27T14:45:07.167268]   job_in_grace_30sec: SI debe haber corrido (retraso <= 60s)
+[2026-07-27T14:45:07.167268] === test_misfire_grace finalizado ===

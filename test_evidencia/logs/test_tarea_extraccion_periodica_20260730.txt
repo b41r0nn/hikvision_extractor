@@ -1,0 +1,18 @@
+[2026-07-30 15:36:48.129] ============================================================
+[2026-07-30 15:36:48.131] Test tarea_extraccion_periodica()
+[2026-07-30 15:36:48.131] ============================================================
+[2026-07-30 15:36:50.543] 
+--- Ejecución 1 ---
+[2026-07-30 15:36:50.544] [MOCK] extractor_hikvision.main() llamado (sin llamar al biométrico real)
+[2026-07-30 15:36:50.579] ultima_extraccion_exitosa tras ejecución 1: 2026-07-30T20:36:50.546366+00:00
+[2026-07-30 15:36:51.681] 
+--- Ejecución 2 (simula doble disparo del cron) ---
+[2026-07-30 15:36:51.684] [MOCK] extractor_hikvision.main() llamado (sin llamar al biométrico real)
+[2026-07-30 15:36:51.695] ultima_extraccion_exitosa tras ejecución 2: 2026-07-30T20:36:51.686678+00:00
+[2026-07-30 15:36:51.697] 
+============================================================
+[2026-07-30 15:36:51.699] [VALIDACIÓN] ultima_extraccion_exitosa actualizada en ambas ejecuciones
+[2026-07-30 15:36:51.701] [VALIDACIÓN] Timestamp avanzó correctamente de ejecución 1 a ejecución 2
+[2026-07-30 15:36:51.703] [VALIDACIÓN] Doble disparo no generó errores ni duplicados
+[2026-07-30 15:36:51.704] [RESULTADO] PASS
+[2026-07-30 15:36:51.706] ============================================================

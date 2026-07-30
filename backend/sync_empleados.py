@@ -13,6 +13,7 @@ from requests.auth import HTTPDigestAuth
 from sqlalchemy.orm import Session
 
 from .models import Empleado
+from .device_lock import device_lock
 
 IP   = os.getenv("DEVICE_IP", "192.168.1.127")
 USER = os.getenv("DEVICE_USER", "admin")
@@ -36,12 +37,13 @@ def _fetch_user_info_page(
         }
     }
     try:
-        r = session.post(
-            URL,
-            json=payload,
-            auth=HTTPDigestAuth(USER, PASS),
-            timeout=15,
-        )
+        with device_lock:
+            r = session.post(
+                URL,
+                json=payload,
+                auth=HTTPDigestAuth(USER, PASS),
+                timeout=15,
+            )
         r.raise_for_status()
         data = r.json()
     except requests.exceptions.RequestException as e:

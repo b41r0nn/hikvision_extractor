@@ -7,7 +7,6 @@ Adaptado para la Fase 2: Guarda los registros en la base de datos PostgreSQL/SQL
 import os
 import uuid
 import socket
-import threading
 import requests
 import argparse
 from datetime import date, timedelta, datetime
@@ -31,6 +30,7 @@ from backend.database import SessionLocal
 from backend.models import RegistroAsistencia
 from backend.timezone import hoy_bogota
 from backend import config_service
+from backend.device_lock import device_lock
 
 # ── Configuración ─────────────────────────────────────────────────────────────
 IP     = os.getenv("DEVICE_IP", "192.168.1.127")
@@ -40,11 +40,8 @@ URL    = f"http://{IP}/ISAPI/AccessControl/AcsEvent?format=json"
 
 BATCH_SIZE = 50
 
-# Lock global para serializar TODAS las llamadas al biométrico.
-# El hardware soporta 1-2 conexiones concurrentes como mucho; cualquier
-# llamada paralela (job programado + manual + script de diagnóstico)
-# puede corromper la paginación y hacer perder eventos.
-_device_lock = threading.Lock()
+# NOTA: el lock global para serializar llamadas al biométrico ahora vive en
+# backend/device_lock.py y es compartido con sync_empleados.py.
 
 EVENT_MAP = {
     (5, 38):   "Fingerprint Recognition Passed",
@@ -69,7 +66,7 @@ def fetch_range(start_iso, end_iso):
     # llamadas (incluso entre paginaciones) hace que el dispositivo
     # pise resultados y se pierdan eventos. UUID v4 por llamada.
     search_id = str(uuid.uuid4())
-    with _device_lock:
+    with device_lock:
         while True:
             payload = {"AcsEventCond": {
                 "searchID": search_id, "searchResultPosition": position,
