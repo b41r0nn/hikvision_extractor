@@ -556,6 +556,49 @@ http://asistencia.redihos.local
 
 ## 17. Backup automático con cron
 
+El repositorio incluye `backup.sh`, que genera siempre la misma copia en
+`backups/hikvision_latest.sql` y también respalda `.env`. Se recomienda este
+script para desarrollo o para mantener una única copia diaria. Si se prefiere
+retención de varios días, usar la Opción B más abajo.
+
+### Opción A: usar `backup.sh` del repositorio (misma copia sobrescrita)
+
+Hacer ejecutable el script:
+
+```bash
+cd /opt/hikvision_asistencia
+chmod +x backup.sh
+```
+
+Probar manualmente:
+
+```bash
+./backup.sh
+ls -lh backups/
+```
+
+Configurar cron para ejecutar todos los días a las 2:00 AM:
+
+```bash
+sudo crontab -e
+```
+
+Agregar la línea:
+
+```cron
+0 2 * * * cd /opt/hikvision_asistencia && ./backup.sh >> /opt/hikvision_asistencia/backups/backup.log 2>&1
+```
+
+Restauración:
+
+```bash
+cd /opt/hikvision_asistencia
+cat backups/hikvision_latest.sql | sudo docker compose -f docker-compose.prod.yml exec -T db psql -U admin -d hikvision
+cp backups/.env.backup .env
+```
+
+### Opción B: script con retención de 30 días
+
 Crear el script de backup:
 
 ```bash
@@ -590,13 +633,13 @@ EOF
 sudo chmod +x /opt/backup_hikvision.sh
 ```
 
-Configurar cron para ejecutar todos los días a las 2:00 AM:
+Configurar cron:
 
 ```bash
 sudo crontab -e
 ```
 
-Agregar la línea:
+Agregar:
 
 ```cron
 0 2 * * * /opt/backup_hikvision.sh >> /var/log/backup_hikvision.log 2>&1
@@ -749,9 +792,9 @@ sudo docker compose -f docker-compose.prod.yml exec db psql -U admin -d hikvisio
 
 Antes de dar por finalizado el deploy, verificar:
 
-- [ ] El archivo `.env` de desarrollo **no** se transfirió dentro del `.zip`.
-- [ ] `SECRET_KEY` se generó nuevo en producción con `secrets.token_urlsafe(32)`.
-- [ ] `FERNET_KEY` coincide con el backup (si aplica) o se generó nueva y se
+- [] El archivo `.env` de desarrollo **no** se transfirió dentro del `.zip`.
+- [] `SECRET_KEY` se generó nuevo en producción con `secrets.token_urlsafe(32)`.
+- [] `FERNET_KEY` coincide con el backup (si aplica) o se generó nueva y se
       reconfiguró SMTP.
 - [ ] `POSTGRES_PASSWORD` es una contraseña fuerte y no la de ejemplo.
 - [ ] `ADMIN_PASSWORD` se cambió y se reseteó el usuario admin.
