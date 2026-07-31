@@ -719,6 +719,18 @@ entre sync de empleados (7:00 AM) y extracción de marcas.
 | Turnos 2-5 | Sin vigencia histórica. Sin impacto real: no hay data de producción todavía. |
 | Deuda técnica vieja | CORS abierto, tests automatizados, `update_empleado` con clientes viejos. |
 
+## Fase 1: refactor de bajo riesgo (31 jul 2026)
+
+Tres cambios aislados, un commit por punto, cada uno con test/grep de evidencia.
+
+| # | Cambio | Evidencia | Commit |
+| --- | --- | --- | --- |
+| 1.1 | Centralizar `DEVICE_IP`/`DEVICE_USER`/`DEVICE_PASS` en `backend/device_config.py`; `extractor_hikvision.py` y `backend/sync_empleados.py` ahora importan desde allí. | `test_evidencia/test_device_config_shared_20260731.py` (PASS): default y custom IP coinciden en ambos módulos; grep confirma que no queda `os.getenv('DEVICE_IP')` duplicado. | `29c8dfc` |
+| 1.2 | `update_empleado` acepta e ignora silenciosamente `hora_entrada`/`tolerancia_minutos` (campos deprecados de clientes viejos); la fuente de verdad sigue siendo `turno_horario`. | `test_evidencia/test_update_empleado_deprecated_20260731.py` (PASS): schema parsea el body con campos viejos; inspección confirma que la función no los referencia; modelo no se modifica por ellos. | `6ff125a` |
+| 1.3 | Artefactos legacy (`hikvision.db`, `eventos.csv`, `eventos_hikvision.csv`, `Informe_Asistencia12.xlsx`) movidos a `legacy/` con `README.md`; `migrate_csv.py` y `README.md` apuntan a `legacy/eventos.csv`. | `test_evidencia/test_legacy_artifacts_20260731.py` (PASS): archivos en `legacy/`, ninguno en raíz, grep no encuentra referencias fuera de `legacy/` excepto la ruta actualizada en migración/documentación. | `d15817c` |
+
+**Nota:** los tests de evidencia se force-added en cada commit pese a que `.gitignore` ignora `test_evidencia/`, para que el arqui pueda reproducirlos.
+
 ### Nota de cierre
 
 Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pérdida de turnos/horarios), pero se resolvió sin daño. El sistema queda operativo y el sprint cerrado hasta producción.
