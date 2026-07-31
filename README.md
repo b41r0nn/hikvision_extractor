@@ -94,7 +94,7 @@ La conexión se define en `backend/database.py`:
 
 ```python
 SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL")
-if not SQLALCHEMY_DATABASE_URL:
+if not SQLALCHEMY_DATABASE_URL: |
     raise RuntimeError(
         "DATABASE_URL no está configurada. Revisá el .env — "
         "no hay fallback por diseño, para evitar arrancar silenciosamente "
@@ -567,7 +567,7 @@ python generar_informe.py --start 2026-07-01 --end 2026-07-31 --output reporte.x
 ### 10.2 Migrar CSV de iVMS-4200
 
 ```bash
-python migrate_csv.py eventos.csv
+python migrate_csv.py legacy/eventos.csv
 ```
 
 ### 10.3 Forzar extracción vía API

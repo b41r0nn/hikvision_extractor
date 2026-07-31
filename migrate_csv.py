@@ -67,5 +67,6 @@ def migrate(csv_path):
 
 
 if __name__ == "__main__":
-    path = sys.argv[1] if len(sys.argv) > 1 else "eventos.csv"
+    # Fase 1: los CSVs de ejemplo se movieron a legacy/.
+    path = sys.argv[1] if len(sys.argv) > 1 else "legacy/eventos.csv"
     migrate(path)
