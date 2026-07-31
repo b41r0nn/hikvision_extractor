@@ -4,7 +4,6 @@ Sincroniza la tabla Empleado con las personas enroladas en el biométrico
 Hikvision vía ISAPI /ISAPI/AccessControl/UserInfo/Search.
 Nunca elimina empleados existentes; solo crea o actualiza nombres.
 """
-import os
 from datetime import datetime
 from typing import Callable, List, Optional
 
@@ -14,11 +13,12 @@ from sqlalchemy.orm import Session
 
 from .models import Empleado
 from .device_lock import device_lock
-
-IP   = os.getenv("DEVICE_IP", "192.168.1.127")
-USER = os.getenv("DEVICE_USER", "admin")
-PASS = os.getenv("DEVICE_PASS", "tu_password")
-URL  = f"http://{IP}/ISAPI/AccessControl/UserInfo/Search?format=json"
+from .device_config import (
+    DEVICE_IP as IP,
+    DEVICE_USER as USER,
+    DEVICE_PASS as PASS,
+    USER_INFO_URL as URL,
+)
 
 BATCH_SIZE = 1000
 

@@ -4,14 +4,12 @@ Extrae eventos de acceso del biométrico Hikvision vía ISAPI REST.
 Adaptado para la Fase 2: Guarda los registros en la base de datos PostgreSQL/SQLite.
 """
 
-import os
 import uuid
 import socket
 import requests
 import argparse
 from datetime import date, timedelta, datetime
 from requests.auth import HTTPDigestAuth
-from dotenv import load_dotenv
 
 
 class DeviceUnavailableError(Exception):
@@ -22,21 +20,23 @@ class DeviceUnavailableError(Exception):
     automáticamente en el próximo arranque con un backfill nuevo."""
     pass
 
-# Cargar variables de entorno desde .env si existe
-load_dotenv()
-
 # Imports de la base de datos
 from backend.database import SessionLocal
 from backend.models import RegistroAsistencia
 from backend.timezone import hoy_bogota
 from backend import config_service
 from backend.device_lock import device_lock
+from backend.device_config import (
+    DEVICE_IP as IP,
+    DEVICE_USER as USER,
+    DEVICE_PASS as PASS,
+    ACS_EVENT_URL as URL,
+)
 
 # ── Configuración ─────────────────────────────────────────────────────────────
-IP     = os.getenv("DEVICE_IP", "192.168.1.127")
-USER   = os.getenv("DEVICE_USER", "admin")
-PASS   = os.getenv("DEVICE_PASS", "tu_password")
-URL    = f"http://{IP}/ISAPI/AccessControl/AcsEvent?format=json"
+# DEVICE_IP/USER/PASS y URLs se leen desde backend.device_config para evitar
+# duplicación con backend/sync_empleados.py. Modificar la variable de entorno
+# afecta a ambos módulos por igual.
 
 BATCH_SIZE = 50
 
