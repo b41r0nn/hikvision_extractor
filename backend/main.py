@@ -279,9 +279,12 @@ class TurnoHorarioCreate(BaseModel):
 class EmpleadoUpdate(BaseModel):
     departamento:       Optional[str] = None
     turno_id:           Optional[int] = None
-    # hora_entrada y tolerancia_minutos individuales quedan deprecados en Fase A.
-    # La fuente de verdad es turno_horario a través del turno_id del empleado.
     activo:             bool = True
+    # Campos deprecados de Fase 1/2: clientes viejos todavía los envían.
+    # Se aceptan para no romper la request, pero se ignoran silenciosamente.
+    # La fuente de verdad para el horario es turno_horario vía turno_id.
+    hora_entrada:       Optional[str] = None
+    tolerancia_minutos: Optional[int] = None
 
 
 class LoginRequest(BaseModel):
