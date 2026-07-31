@@ -264,6 +264,9 @@ class TurnoCreate(BaseModel):
 class TurnoUpdate(BaseModel):
     nombre:             str
     hora_salida:        Optional[str] = None
+    # Al editar un turno se puede enviar la lista completa de horarios.
+    # Cada día modificado genera una nueva vigencia desde hoy_bogota().
+    horarios:           Optional[List[TurnoHorarioItem]] = None
 
 
 class TurnoHorarioCreate(BaseModel):
@@ -954,12 +957,43 @@ def update_turno(
     db: Session = Depends(get_db),
     user: models.Usuario = Depends(require_perm("admin_empleados")),
 ):
-    """Actualiza nombre y hora de salida de un turno (no sus horarios)."""
+    """Actualiza nombre, hora de salida y horarios de un turno.
+
+    Los horarios enviados generan nuevas vigencias (versionado) para los días
+    que cambian respecto al horario vigente de hoy. Los días sin cambio no se
+    tocan.
+    """
     obj = db.query(models.Turno).filter(models.Turno.id == turno_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Turno no encontrado.")
     obj.nombre = t.nombre
     obj.hora_salida = _str_to_time(t.hora_salida)
+
+    if t.horarios is not None:
+        hoy = hoy_bogota()
+        for h in t.horarios:
+            if not (0 <= h.dia_semana <= 4):
+                raise HTTPException(status_code=400, detail="dia_semana debe estar entre 0 (lunes) y 4 (viernes)")
+
+            try:
+                he_actual, tol_actual = obtener_horario_vigente(db, turno_id, h.dia_semana, hoy)
+                cambio = (
+                    he_actual != _str_to_time(h.hora_entrada) or
+                    tol_actual != h.tolerancia_minutos
+                )
+            except HorarioNoConfiguradoError:
+                cambio = True
+
+            if cambio:
+                nuevo = models.TurnoHorario(
+                    turno_id=turno_id,
+                    dia_semana=h.dia_semana,
+                    hora_entrada=_str_to_time(h.hora_entrada),
+                    tolerancia_minutos=h.tolerancia_minutos,
+                    vigente_desde=hoy,
+                )
+                db.add(nuevo)
+
     db.commit()
     db.refresh(obj)
     return {
