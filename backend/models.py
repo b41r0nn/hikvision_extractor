@@ -150,5 +150,7 @@ class Usuario(Base):
     rol_id                    = Column(Integer, ForeignKey("roles.id"), nullable=False)
     activo                    = Column(Boolean, default=True, nullable=False)
     requiere_cambio_password  = Column(Boolean, default=False, nullable=False)
+    updated_by                = Column(Integer, nullable=True)  # id del admin que hizo el último cambio
+    updated_at                = Column(DateTime, server_default=func.now(), nullable=False)
 
     rol = relationship("Rol", back_populates="usuarios")

@@ -4,11 +4,12 @@ API principal del Sistema de Asistencia Biométrica REDIHOS.
 """
 import io
 import os
+import secrets
 import time as _time
-from contextlib import asynccontextmanager
-from datetime import date, time, timedelta
-from typing import List, Optional
 import threading
+from contextlib import asynccontextmanager
+from datetime import date, datetime, time, timedelta, timezone
+from typing import List, Optional
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -589,6 +590,44 @@ def delete_usuario(
     db.delete(obj)
     db.commit()
     return
+
+
+@app.post("/api/usuarios/{usuario_id}/resetear-password")
+def resetear_password_usuario(
+    usuario_id: int,
+    db: Session = Depends(get_db),
+    current: models.Usuario = Depends(require_perm("admin_roles")),
+):
+    """
+    Genera una contraseña temporal aleatoria para un usuario, la hashea con
+    Argon2id y marca requiere_cambio_password=True. Devuelve la contraseña
+    temporal UNA sola vez; no se almacena en texto plano ni en BD ni en logs.
+    """
+    obj = db.query(models.Usuario).filter(models.Usuario.id == usuario_id).first()
+    if not obj:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if obj.id == current.id:
+        raise HTTPException(status_code=400, detail="No puedes resetear tu propia contraseña desde aquí")
+
+    # 16 caracteres hexadecimales (64 bits de entropía) — legible y seguro.
+    temp_password = secrets.token_hex(8)
+
+    obj.password_hash = get_password_hash(temp_password)
+    obj.requiere_cambio_password = True
+    obj.updated_by = current.id
+    obj.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(obj)
+
+    # Nota: la contraseña temporal solo viaja en este response. Nunca se loguea.
+    return {
+        "id": obj.id,
+        "username": obj.username,
+        "password_temporal": temp_password,
+        "requiere_cambio_password": True,
+        "actualizado_por": current.username,
+        "actualizado_en": obj.updated_at.isoformat(),
+    }
 
 
 @app.get("/api/status")
