@@ -731,6 +731,16 @@ Tres cambios aislados, un commit por punto, cada uno con test/grep de evidencia.
 
 **Nota:** los tests de evidencia y sus logs quedan **solo en filesystem local** (`test_evidencia/` está en `.gitignore`); los 3 `.py` se force-added por error y ya fueron removidos del tracking (`d0b0c25`). Los logs revisados no contienen secretos reales (`DEVICE_PASS`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, `SECRET_KEY`, `FERNET_KEY` ni hashes/tokens).
 
+## Fase 2: endpoint de reset de contraseña (31 jul 2026)
+
+| # | Cambio | Evidencia | Commit |
+| --- | --- | --- | --- |
+| 2.1 | Nuevo endpoint `POST /api/usuarios/{id}/resetear-password`, solo admin (`require_perm("admin_roles")`). | `test_evidencia/test_resetear_password_20260731.py` (PASS): crea usuario, resetea vía endpoint, confirma que hash cambió y `requiere_cambio_password=True`; confirma que no-admin recibe 403; confirma que la contraseña temporal no queda en texto plano en BD ni logs. | `b48879d` |
+| 2.2 | Migración `ea4c5fd67b9f` agrega `updated_by`/`updated_at` a `usuarios` para auditoría (patrón igual al de `configuracion_correo`). | El endpoint setea `updated_by` = id del admin y `updated_at` = UTC; test lo verifica en BD. | `b48879d` |
+| 2.3 | Contraseña temporal generada con `secrets.token_hex(8)` (16 chars hex), hasheada con Argon2id, devuelta **una sola vez** en el response; nunca se loguea ni se almacena en claro. | Test escanea todas las tablas y el log de uvicorn; no encuentra la contraseña temporal. | `b48879d` |
+
+**Nota:** el frontend/panel **NO** se tocó. El botón en UI queda pendiente para revisión manual antes de agregarlo.
+
 ### Nota de cierre
 
 Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pérdida de turnos/horarios), pero se resolvió sin daño. El sistema queda operativo y el sprint cerrado hasta producción.
