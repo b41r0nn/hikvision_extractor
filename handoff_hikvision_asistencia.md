@@ -729,7 +729,7 @@ Tres cambios aislados, un commit por punto, cada uno con test/grep de evidencia.
 | 1.2 | `update_empleado` acepta e ignora silenciosamente `hora_entrada`/`tolerancia_minutos` (campos deprecados de clientes viejos); la fuente de verdad sigue siendo `turno_horario`. | `test_evidencia/test_update_empleado_deprecated_20260731.py` (PASS): schema parsea el body con campos viejos; inspección confirma que la función no los referencia; modelo no se modifica por ellos. | `6ff125a` |
 | 1.3 | Artefactos legacy (`hikvision.db`, `eventos.csv`, `eventos_hikvision.csv`, `Informe_Asistencia12.xlsx`) movidos a `legacy/` con `README.md`; `migrate_csv.py` y `README.md` apuntan a `legacy/eventos.csv`. | `test_evidencia/test_legacy_artifacts_20260731.py` (PASS): archivos en `legacy/`, ninguno en raíz, grep no encuentra referencias fuera de `legacy/` excepto la ruta actualizada en migración/documentación. | `d15817c` |
 
-**Nota:** los tests de evidencia se force-added en cada commit pese a que `.gitignore` ignora `test_evidencia/`, para que el arqui pueda reproducirlos.
+**Nota:** los tests de evidencia y sus logs quedan **solo en filesystem local** (`test_evidencia/` está en `.gitignore`); los 3 `.py` se force-added por error y ya fueron removidos del tracking (`d0b0c25`). Los logs revisados no contienen secretos reales (`DEVICE_PASS`, `POSTGRES_PASSWORD`, `ADMIN_PASSWORD`, `SECRET_KEY`, `FERNET_KEY` ni hashes/tokens).
 
 ### Nota de cierre
 
