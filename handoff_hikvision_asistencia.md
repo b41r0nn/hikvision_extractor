@@ -741,6 +741,8 @@ Tres cambios aislados, un commit por punto, cada uno con test/grep de evidencia.
 
 **Nota:** el frontend/panel **NO** se tocó. El botón en UI queda pendiente para revisión manual antes de agregarlo.
 
+**Limitación conocida (no bloqueante):** `updated_by`/`updated_at` en `usuarios` son genéricos. Hoy solo el endpoint de reset los actualiza (`update_usuario` no los toca), por lo que el timestamp apunta efectivamente al último reset. Pero si en el futuro se empiezan a usar para otros cambios (rol, activo, etc.), el rastro de auditoría del reset se perderá entre otras operaciones. Para trazabilidad completa del evento "reset de contraseña" haría falta una tabla de log separada (ej. `log_auditoria`) con tipo de acción. No es un problema de seguridad; es un detalle de auditoría a resolver más adelante.
+
 ### Nota de cierre
 
 Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pérdida de turnos/horarios), pero se resolvió sin daño. El sistema queda operativo y el sprint cerrado hasta producción.
