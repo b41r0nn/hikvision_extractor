@@ -739,7 +739,7 @@ Tres cambios aislados, un commit por punto, cada uno con test/grep de evidencia.
 | 2.2 | Migración `ea4c5fd67b9f` agrega `updated_by`/`updated_at` a `usuarios` para auditoría (patrón igual al de `configuracion_correo`). | El endpoint setea `updated_by` = id del admin y `updated_at` = UTC; test lo verifica en BD. | `b48879d` |
 | 2.3 | Contraseña temporal generada con `secrets.token_hex(8)` (16 chars hex), hasheada con Argon2id, devuelta **una sola vez** en el response; nunca se loguea ni se almacena en claro. | Test escanea todas las tablas y el log de uvicorn; no encuentra la contraseña temporal. | `b48879d` |
 
-| 2.4 | Botón **"Resetear pass"** en el panel de Usuarios (`frontend/index.html` + `frontend/app.js`). | Confirmación destructiva pidiendo escribir el username exacto; modal muestra la contraseña temporal con botón Copiar (con manejo de error); no aparece el botón sobre el propio usuario logueado; gatillado por el mismo permiso `admin_roles` que el backend. | `POR_COMMIT` |
+| 2.4 | Botón **"Resetear pass"** en el panel de Usuarios (`frontend/index.html` + `frontend/app.js`). | Confirmación destructiva pidiendo escribir el username exacto; modal muestra la contraseña temporal con botón Copiar (con manejo de error); no aparece el botón sobre el propio usuario logueado; gatillado por el mismo permiso `admin_roles` que el backend. | `5d3ac3a` |
 
 **Nota:** el test de UI (`test_evidencia/test_reset_password_ui_20260731.py`) verifica que el frontend esté cableado y que el endpoint responda, pero no ejecuta un browser real. Validación visual del modal queda para prueba manual en el panel.
 
