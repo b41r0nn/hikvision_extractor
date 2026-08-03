@@ -1063,7 +1063,8 @@ async function cargarUsuariosRoles() {
                     <input type="checkbox" ${u.activo ? 'checked' : ''} class="emp-checkbox"
                            onchange="toggleUsuario(${u.id}, this.checked)">
                 </td>
-                <td>
+                <td class="flex gap-1">
+                    ${u.id !== currentUser?.id ? `<button onclick="resetearPasswordUsuario(${u.id}, '${u.username}')" class="btn-warning text-xs py-1">Resetear pass</button>` : ''}
                     <button onclick="eliminarUsuario(${u.id})" class="btn-danger text-xs py-1">Eliminar</button>
                 </td>
             </tr>`;
@@ -1132,6 +1133,56 @@ async function eliminarUsuario(id) {
         cargarUsuariosRoles();
     } catch(e) { showToast(e.message, 'error'); }
 }
+
+
+async function resetearPasswordUsuario(id, username) {
+    // Doble seguridad: no permitir auto-reset.
+    if (id === currentUser?.id) {
+        showToast('No puedes resetear tu propia contraseña', 'error');
+        return;
+    }
+    // Confirmación destructiva: escribir el username exacto.
+    const confirmacion = prompt(`Para resetear la contraseña de "${username}", escribí el nombre de usuario exacto:`);
+    if (confirmacion === null) return; // Canceló.
+    if (confirmacion.trim() !== username) {
+        showToast('El usuario no coincide. Cancelado.', 'error');
+        return;
+    }
+
+    try {
+        const res = await apiFetch(`${API}/usuarios/${id}/resetear-password`, { method: 'POST' });
+        if (!res.ok) throw new Error((await res.json()).detail || 'Error');
+        const data = await res.json();
+        mostrarPasswordTemporal(data.password_temporal);
+        cargarUsuariosRoles();
+    } catch(e) { showToast(e.message, 'error'); }
+}
+
+
+function mostrarPasswordTemporal(password) {
+    document.getElementById('reset-password-temp').value = password;
+    document.getElementById('modal-reset-password').classList.remove('hidden');
+}
+
+
+function cerrarModalResetPassword() {
+    document.getElementById('reset-password-temp').value = '';
+    document.getElementById('modal-reset-password').classList.add('hidden');
+}
+
+
+function copiarPasswordTemporal() {
+    const input = document.getElementById('reset-password-temp');
+    input.select();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value)
+            .then(() => showToast('Contraseña copiada', 'success'))
+            .catch(() => showToast('No se pudo copiar automático — selecciona el texto y Ctrl+C', 'warning'));
+    } else {
+        showToast('No se pudo copiar automático — selecciona el texto y Ctrl+C', 'warning');
+    }
+}
+
 
 async function crearRol() {
     const nombre = document.getElementById('new-rol-nombre').value.trim();
