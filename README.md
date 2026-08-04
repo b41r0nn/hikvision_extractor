@@ -15,12 +15,12 @@ roles, permisos y configuración de correo desde una interfaz web.
 
 ### 1.1 Servicios
 
-| Servicio | Tecnología | Puerto expuesto | Responsabilidad |
-| --- | --- | --- | --- |
-| Base de datos | PostgreSQL 15 (Alpine) | `5432` | Persistencia de empleados, marcas, festivos, usuarios, roles y configuración. |
-| Backend API | FastAPI + Uvicorn (Python 3.11) | `8000` | Extracción, reportes, autenticación, RBAC, scheduler y configuración. |
-| Frontend | Nginx + HTML/JS | `3000` | Panel de login, dashboard, reportes y administración. |
-| Scheduler | APScheduler (dentro del backend) | — | Jobs de extracción diaria, sync de empleados y reportes semanal/mensual. |
+| Servicio      | Tecnología                       | Puerto expuesto | Responsabilidad                                                               |
+| ------------- | -------------------------------- | --------------- | ----------------------------------------------------------------------------- |
+| Base de datos | PostgreSQL 15 (Alpine)           | `5432`          | Persistencia de empleados, marcas, festivos, usuarios, roles y configuración. |
+| Backend API   | FastAPI + Uvicorn (Python 3.11)  | `8000`          | Extracción, reportes, autenticación, RBAC, scheduler y configuración.         |
+| Frontend      | Nginx + HTML/JS                  | `3000`          | Panel de login, dashboard, reportes y administración.                         |
+| Scheduler     | APScheduler (dentro del backend) | —               | Jobs de extracción diaria, sync de empleados y reportes semanal/mensual.      |
 
 ### 1.2 Diagrama de flujo
 
@@ -112,18 +112,18 @@ proceso falla al arrancar.
 
 ### 3.2 Tablas principales
 
-| Tabla | Propósito |
-| --- | --- |
-| `turnos` | Catálogo legacy de turnos. La UI actual usa turno individual por empleado. |
-| `empleados` | Personas registradas en el sistema. `employee_id` enlaza con el biométrico. |
-| `festivos` | Festivos colombianos poblados automáticamente por `holidays`. |
-| `registros_asistencia` | Cada marca de entrada/salida extraída del biométrico. |
-| `configuracion` | Clave-valor persistente: destinatarios de correo, periodicidad, última extracción, alertas. |
+| Tabla                  | Propósito                                                                                     |
+| ---------------------- | --------------------------------------------------------------------------------------------- |
+| `turnos`               | Catálogo legacy de turnos. La UI actual usa turno individual por empleado.                    |
+| `empleados`            | Personas registradas en el sistema. `employee_id` enlaza con el biométrico.                   |
+| `festivos`             | Festivos colombianos poblados automáticamente por `holidays`.                                 |
+| `registros_asistencia` | Cada marca de entrada/salida extraída del biométrico.                                         |
+| `configuracion`        | Clave-valor persistente: destinatarios de correo, periodicidad, última extracción, alertas.   |
 | `configuracion_correo` | Fila única con la configuración SMTP encriptada (host, puerto, usuario, password, seguridad). |
-| `permisos` | Lista canónica de permisos del sistema (ej. `ver_dashboard`, `admin_roles`). |
-| `roles` | Roles definidos por el administrador. |
-| `rol_permiso` | Relación muchos-a-muchos entre roles y permisos. |
-| `usuarios` | Usuarios del panel web con `password_hash`, rol y bandera de cambio de contraseña. |
+| `permisos`             | Lista canónica de permisos del sistema (ej. `ver_dashboard`, `admin_roles`).                  |
+| `roles`                | Roles definidos por el administrador.                                                         |
+| `rol_permiso`          | Relación muchos-a-muchos entre roles y permisos.                                              |
+| `usuarios`             | Usuarios del panel web con `password_hash`, rol y bandera de cambio de contraseña.            |
 
 ### 3.3 Relaciones clave
 
@@ -209,12 +209,12 @@ El `backend.Dockerfile` instala `tzdata`, define `TZ=America/Bogota` y vincula
 
 Usa `BackgroundScheduler` de APScheduler con los siguientes jobs:
 
-| Job | Horario | Función |
-| --- | --- | --- |
-| `sync_empleados_diaria` | 7:00 AM | Sincroniza empleados enrolados desde el biométrico. |
-| `extraccion_periodica` | 6:00 AM - 8:00 PM (cada hora) | Extrae las marcaciones del día en horario laboral. |
-| `reporte_semanal` | Configurable | Envía por correo el informe de la semana pasada. |
-| `reporte_mensual` | Configurable | Envía por correo el informe del mes anterior. |
+| Job                     | Horario                       | Función                                             |
+| ----------------------- | ----------------------------- | --------------------------------------------------- |
+| `sync_empleados_diaria` | 7:00 AM                       | Sincroniza empleados enrolados desde el biométrico. |
+| `extraccion_periodica`  | 6:00 AM - 8:00 PM (cada hora) | Extrae las marcaciones del día en horario laboral.  |
+| `reporte_semanal`       | Configurable                  | Envía por correo el informe de la semana pasada.    |
+| `reporte_mensual`       | Configurable                  | Envía por correo el informe del mes anterior.       |
 
 Parámetros importantes:
 
@@ -470,31 +470,31 @@ en el código**. El repositorio incluye `.env.example` y `.gitignore` ignora el
 
 Copiar `.env.example` a `.env` y completar los valores reales.
 
-| Variable | Ejemplo | Descripción |
-| --- | --- | --- |
-| `DATABASE_URL` | `postgresql://admin:<POSTGRES_PASSWORD>@db:5432/hikvision` | URL de conexión a PostgreSQL. |
-| `POSTGRES_USER` | `admin` | Usuario de PostgreSQL (debe coincidir con `docker-compose.yml`). |
-| `POSTGRES_PASSWORD` | `<POSTGRES_PASSWORD>` | Contraseña de PostgreSQL. |
-| `POSTGRES_DB` | `hikvision` | Nombre de la base de datos. |
-| `DEVICE_IP` | `192.168.1.127` | IP del biométrico en la red local. |
-| `DEVICE_USER` | `admin` | Usuario del biométrico. |
-| `DEVICE_PASS` | `tu_password` | Contraseña del biométrico. |
-| `BACKFILL_TIMEOUT_SEC` | `3600` | Techo duro en segundos para el backfill de arranque. |
-| `FERNET_KEY` | `<tu_fernet_key>` | Clave para encriptar la contraseña SMTP en reposo. Generar con `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
-| `SMTP_HOST` | `smtp.gmail.com` | **DEPRECADO** — ahora se configura en el panel Admin. |
-| `SMTP_PORT` | `587` | **DEPRECADO** — ahora se configura en el panel Admin. |
-| `SMTP_USER` | `tu_correo@gmail.com` | **DEPRECADO** — ahora se configura en el panel Admin. |
-| `SMTP_APP_PASSWORD` | `xxxxxxxxxxxxxxxx` | **DEPRECADO** — ahora se guarda encriptado en la BD. |
-| `REPORT_RECIPIENTS` | `rrhh@redihos.com` | Destinatarios iniciales de reportes automáticos. |
-| `DEFAULT_TURNO_ENTRADA` | `07:30` | **DEPRECADO** en Fase A. Ya no se usa; todo empleado debe tener turno_id real. |
-| `DEFAULT_TOLERANCIA_MINUTOS` | `10` | **DEPRECADO** en Fase A. Ya no se usa; el horario se lee desde `turno_horario`. |
-| `MARCA_FUSION_MINUTOS` | `2` | Ventana para fusionar marcas en el Excel. |
-| `SECRET_KEY` | `...` | Clave para firmar JWT. Generar en producción. |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | `480` | Duración del token en minutos. |
-| `ADMIN_USERNAME` | `admin` | Usuario admin inicial. |
-| `ADMIN_PASSWORD` | `Ingreso2026*` | Contraseña temporal del admin; cambiar en producción. |
-| `REPORTES_USERNAME` | `reportes` | (Opcional) Usuario de solo reportes. |
-| `REPORTES_PASSWORD` | `reportes` | (Opcional) Contraseña del usuario de reportes. |
+| Variable                      | Ejemplo                                                    | Descripción                                                                                                                                                 |
+| ----------------------------- | ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                | `postgresql://admin:<POSTGRES_PASSWORD>@db:5432/hikvision` | URL de conexión a PostgreSQL.                                                                                                                               |
+| `POSTGRES_USER`               | `admin`                                                    | Usuario de PostgreSQL (debe coincidir con `docker-compose.yml`).                                                                                            |
+| `POSTGRES_PASSWORD`           | `<POSTGRES_PASSWORD>`                                      | Contraseña de PostgreSQL.                                                                                                                                   |
+| `POSTGRES_DB`                 | `hikvision`                                                | Nombre de la base de datos.                                                                                                                                 |
+| `DEVICE_IP`                   | `192.168.1.127`                                            | IP del biométrico en la red local.                                                                                                                          |
+| `DEVICE_USER`                 | `admin`                                                    | Usuario del biométrico.                                                                                                                                     |
+| `DEVICE_PASS`                 | `tu_password`                                              | Contraseña del biométrico.                                                                                                                                  |
+| `BACKFILL_TIMEOUT_SEC`        | `3600`                                                     | Techo duro en segundos para el backfill de arranque.                                                                                                        |
+| `FERNET_KEY`                  | `<tu_fernet_key>`                                          | Clave para encriptar la contraseña SMTP en reposo. Generar con `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
+| `SMTP_HOST`                   | `smtp.gmail.com`                                           | **DEPRECADO** — ahora se configura en el panel Admin.                                                                                                       |
+| `SMTP_PORT`                   | `587`                                                      | **DEPRECADO** — ahora se configura en el panel Admin.                                                                                                       |
+| `SMTP_USER`                   | `tu_correo@gmail.com`                                      | **DEPRECADO** — ahora se configura en el panel Admin.                                                                                                       |
+| `SMTP_APP_PASSWORD`           | `xxxxxxxxxxxxxxxx`                                         | **DEPRECADO** — ahora se guarda encriptado en la BD.                                                                                                        |
+| `REPORT_RECIPIENTS`           | `rrhh@redihos.com`                                         | Destinatarios iniciales de reportes automáticos.                                                                                                            |
+| `DEFAULT_TURNO_ENTRADA`       | `07:30`                                                    | **DEPRECADO** en Fase A. Ya no se usa; todo empleado debe tener turno_id real.                                                                              |
+| `DEFAULT_TOLERANCIA_MINUTOS`  | `10`                                                       | **DEPRECADO** en Fase A. Ya no se usa; el horario se lee desde `turno_horario`.                                                                             |
+| `MARCA_FUSION_MINUTOS`        | `2`                                                        | Ventana para fusionar marcas en el Excel.                                                                                                                   |
+| `SECRET_KEY`                  | `...`                                                      | Clave para firmar JWT. Generar en producción.                                                                                                               |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | `480`                                                      | Duración del token en minutos.                                                                                                                              |
+| `ADMIN_USERNAME`              | `admin`                                                    | Usuario admin inicial.                                                                                                                                      |
+| `ADMIN_PASSWORD`              | `Ingreso2026*`                                             | Contraseña temporal del admin; cambiar en producción.                                                                                                       |
+| `REPORTES_USERNAME`           | `reportes`                                                 | (Opcional) Usuario de solo reportes.                                                                                                                        |
+| `REPORTES_PASSWORD`           | `reportes`                                                 | (Opcional) Contraseña del usuario de reportes.                                                                                                              |
 
 ---
 
@@ -630,13 +630,13 @@ SELECT username, activo, requiere_cambio_password FROM usuarios;
 
 #### Opción B: Desde un cliente gráfico
 
-| Campo | Valor |
-| --- | --- |
-| Host | `localhost` (o la IP del servidor en producción) |
-| Puerto | `5432` |
-| Base de datos | `hikvision` |
-| Usuario | `admin` |
-| Contraseña | valor de `POSTGRES_PASSWORD` en `.env` |
+| Campo         | Valor                                            |
+| ------------- | ------------------------------------------------ |
+| Host          | `localhost` (o la IP del servidor en producción) |
+| Puerto        | `5432`                                           |
+| Base de datos | `hikvision`                                      |
+| Usuario       | `admin`                                          |
+| Contraseña    | valor de `POSTGRES_PASSWORD` en `.env`           |
 
 Clientes soportados: DBeaver, pgAdmin, DataGrip, TablePlus, etc.
 
