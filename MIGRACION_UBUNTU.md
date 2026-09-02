@@ -18,7 +18,7 @@ usando Docker y Docker Compose en producción.
 - IP fija asignada al servidor (por DHCP reservado o configuración estática).
 - Acceso SSH desde la máquina de desarrollo Windows.
 - Puertos libres: `80` (frontend Nginx) y `8000` (backend FastAPI).
-- Al menos **4 GB de RAM** y **20 GB de disco** disponibles.
+- Al menos **4 GB de RAM** y **20 GB de disco** disponibles
 
 ---
 
@@ -100,14 +100,14 @@ Compress-Archive -Path $items.FullName -DestinationPath $zip
 
 **Exclusiones obligatorias:**
 
-| Patrón | Motivo |
-| --- | --- |
-| `.git` | No se necesita en producción. |
-| `.env` | Contiene secretos; se crea nuevo en el servidor. |
-| `__pycache__` | Artefactos de compilación Python. |
-| `node_modules` | Dependencias frontend no necesarias en producción. |
-| `pgdata` | Datos locales de PostgreSQL; se migran por pg_dump. |
-| `test_evidencia` | Logs y scripts de prueba internos. |
+| Patrón           | Motivo                                              |
+| ---------------- | --------------------------------------------------- |
+| `.git`           | No se necesita en producción.                       |
+| `.env`           | Contiene secretos; se crea nuevo en el servidor.    |
+| `__pycache__`    | Artefactos de compilación Python.                   |
+| `node_modules`   | Dependencias frontend no necesarias en producción.  |
+| `pgdata`         | Datos locales de PostgreSQL; se migran por pg_dump. |
+| `test_evidencia` | Logs y scripts de prueba internos.                  |
 
 ---
 
@@ -188,16 +188,16 @@ nano .env
 
 Variables que **deben** cambiarse obligatoriamente:
 
-| Variable | Descripción |
-| --- | --- |
-| `POSTGRES_PASSWORD` | Contraseña fuerte para PostgreSQL. |
-| `DATABASE_URL` | Debe usar el servicio `db`: `postgresql://admin:<POSTGRES_PASSWORD>@db:5432/hikvision` |
-| `FERNET_KEY` | **Ver paso obligatorio más abajo.** Clave Fernet para desencriptar la contraseña SMTP. |
-| `SECRET_KEY` | Clave para firmar JWT. Generar una nueva en producción. |
-| `ADMIN_PASSWORD` | Contraseña temporal del usuario admin inicial. |
-| `DEVICE_IP` | IP que Ubuntu ve del biométrico Hikvision. |
-| `DEVICE_USER` | Usuario del biométrico. |
-| `DEVICE_PASS` | Contraseña del biométrico. |
+| Variable            | Descripción                                                                            |
+| ------------------- | -------------------------------------------------------------------------------------- |
+| `POSTGRES_PASSWORD` | Contraseña fuerte para PostgreSQL.                                                     |
+| `DATABASE_URL`      | Debe usar el servicio `db`: `postgresql://admin:<POSTGRES_PASSWORD>@db:5432/hikvision` |
+| `FERNET_KEY`        | **Ver paso obligatorio más abajo.** Clave Fernet para desencriptar la contraseña SMTP. |
+| `SECRET_KEY`        | Clave para firmar JWT. Generar una nueva en producción.                                |
+| `ADMIN_PASSWORD`    | Contraseña temporal del usuario admin inicial.                                         |
+| `DEVICE_IP`         | IP que Ubuntu ve del biométrico Hikvision.                                             |
+| `DEVICE_USER`       | Usuario del biométrico.                                                                |
+| `DEVICE_PASS`       | Contraseña del biométrico.                                                             |
 
 ### Paso obligatorio: decidir `FERNET_KEY` antes de generar nada
 
