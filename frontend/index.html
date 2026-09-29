@@ -112,20 +112,7 @@
     <div class="glass p-8 w-full max-w-sm space-y-6">
         <div class="text-center">
             <div class="flex justify-center mb-4">
-                <svg viewBox="0 0 240 100" class="h-16 w-auto" aria-label="Logo REDIHOS">
-                    <defs>
-                        <linearGradient id="ovalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                            <stop offset="0%" stop-color="#0056A8"/>
-                            <stop offset="100%" stop-color="#003D7A"/>
-                        </linearGradient>
-                    </defs>
-                    <ellipse cx="120" cy="45" rx="115" ry="42" fill="url(#ovalGrad)" stroke="#004C99" stroke-width="2"/>
-                    <path d="M55 60 C 45 30, 70 15, 90 25 C 75 35, 70 50, 85 65" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
-                    <path d="M80 62 C 68 28, 95 12, 118 22 C 100 34, 95 52, 112 66" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
-                    <path d="M105 64 C 92 28, 120 12, 145 22 C 126 34, 122 54, 140 67" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
-                    <text x="120" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="bold" fill="white" letter-spacing="1">REDIHOS</text>
-                    <text x="198" y="60" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="normal" fill="white">S.A.S.</text>
-                </svg>
+                <img src="logo.png" class="h-16 w-auto" alt="Logo REDIHOS">
             </div>
             <h1 class="text-xl font-bold text-white">Sistema de Asistencia</h1>
             <p class="text-xs text-slate-400 mt-1">REDIHOS S.A.S.</p>
@@ -175,20 +162,7 @@
 <nav id="sidebar" class="flex flex-col p-4 pt-6 flex-shrink-0">
     <div class="mb-8 px-2">
         <div class="mb-2">
-            <svg viewBox="0 0 240 100" class="h-14 w-auto" aria-label="Logo REDIHOS">
-                <defs>
-                    <linearGradient id="ovalGradSidebar" x1="0%" y1="0%" x2="100%" y2="100%">
-                        <stop offset="0%" stop-color="#0056A8"/>
-                        <stop offset="100%" stop-color="#003D7A"/>
-                    </linearGradient>
-                </defs>
-                <ellipse cx="120" cy="45" rx="115" ry="42" fill="url(#ovalGradSidebar)" stroke="#004C99" stroke-width="2"/>
-                <path d="M55 60 C 45 30, 70 15, 90 25 C 75 35, 70 50, 85 65" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
-                <path d="M80 62 C 68 28, 95 12, 118 22 C 100 34, 95 52, 112 66" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
-                <path d="M105 64 C 92 28, 120 12, 145 22 C 126 34, 122 54, 140 67" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
-                <text x="120" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="bold" fill="white" letter-spacing="1">REDIHOS</text>
-                <text x="198" y="60" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="normal" fill="white">S.A.S.</text>
-            </svg>
+            <img src="logo.png" class="h-14 w-auto" alt="Logo REDIHOS">
         </div>
         <h1 class="text-base font-bold text-white leading-tight">Sistema de Asistencia</h1>
         <p class="text-xs text-slate-500 mt-0.5">REDIHOS S.A.S.</p>
@@ -303,13 +277,9 @@
                         <h3 class="font-semibold text-white text-sm">Llegadas Tarde Hoy</h3>
                         <span class="text-xs text-slate-500" id="tardanzas-count"></span>
                     </div>
-                    <div class="flex items-center gap-2">
-                        <input type="text" id="search-tardanzas" placeholder="Buscar empleado..."
-                               class="form-input w-40 text-xs py-1.5" oninput="filtrarTardanzas()">
-                        <button onclick="exportarTardanzasExcel()" class="btn-secondary text-xs py-1.5 px-2" title="Exportar a Excel">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                        </button>
-                    </div>
+                    <button onclick="exportarTardanzasExcel()" class="btn-secondary text-xs py-1.5 px-2" title="Exportar a Excel">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    </button>
                 </div>
                 <div class="overflow-auto">
                     <table class="data-table">
@@ -328,13 +298,17 @@
             </div>
 
             <!-- Marcas del día -->
-            <div class="glass p-0 overflow-hidden">
-                <div class="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
+            <div class="glass p-0 overflow-hidden flex flex-col">
+                <div class="px-6 py-4 border-b border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <h3 class="font-semibold text-white text-sm">Marcas del Día</h3>
-                    <input type="date" id="filter-date" onchange="cargarMarcas()"
-                           class="form-input w-36 text-xs py-1">
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="search-marcas" placeholder="Buscar empleado..."
+                               class="form-input w-40 text-xs py-1.5" oninput="filtrarMarcas()">
+                        <input type="date" id="filter-date" onchange="cargarMarcas()"
+                               class="form-input w-36 text-xs py-1.5">
+                    </div>
                 </div>
-                <div class="overflow-auto">
+                <div class="overflow-y-auto" style="max-height: calc(100vh - 320px);">
                     <table class="data-table">
                         <thead><tr>
                             <th>Empleado</th>

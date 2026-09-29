@@ -12,6 +12,7 @@ let userPermisos    = [];
 let rolesCache      = [];
 let reportMode      = 'entrada_salida';   // 'entrada_salida' | 'completo'
 let tardanzasHoy    = [];                 // datos crudos filtrados (<=30 min)
+let marcasHoy       = [];                 // datos crudos de marcas del dashboard
 let historicoTardanzas = [];              // datos crudos del histórico
 
 // ── Utilidades ─────────────────────────────────────────────────────────────
@@ -313,6 +314,9 @@ function exportarHistoricoExcel() {
 // ── Dashboard ──────────────────────────────────────────────────────────────
 async function cargarDashboard() {
     const fecha = document.getElementById('kpi-date').value || hoy();
+    // Sincronizar el selector de marcas con el selector principal de KPIs
+    const filterDate = document.getElementById('filter-date');
+    if (filterDate && filterDate.value !== fecha) filterDate.value = fecha;
     await Promise.all([cargarKPIs(fecha), cargarTardanzas(fecha), cargarMarcas()]);
     await mostrarAvisoExtraccion();
 }
@@ -395,12 +399,22 @@ async function mostrarAvisoExtraccion() {
 }
 
 async function cargarKPIs(fecha) {
+    const defaultError = (msg) => {
+        ['kpi-total','kpi-presentes','kpi-tardanzas','kpi-tiempo-pct','kpi-tiempo-sub','kpi-minutos-perdidos']
+            .forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.textContent = '—';
+            });
+    };
     try {
         const res  = await apiFetch(`${API}/kpis?fecha=${fecha}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+            defaultError('Error');
+            return;
+        }
         const data = await res.json();
-        document.getElementById('kpi-total').textContent     = data.total_marcaciones   ?? '—';
-        document.getElementById('kpi-presentes').textContent = data.empleados_con_marca ?? '—';
+        document.getElementById('kpi-total').textContent     = data.total_marcaciones   ?? 0;
+        document.getElementById('kpi-presentes').textContent = data.empleados_con_marca ?? 0;
 
         // Los KPIs de tardanza se calculan con el filtro de <=30 minutos.
         const kpiTardanza = calcularKPIsTardanza(tardanzasHoy, data.empleados_con_marca);
@@ -410,6 +424,7 @@ async function cargarKPIs(fecha) {
         document.getElementById('kpi-minutos-perdidos').textContent = `${kpiTardanza.minutos_perdidos_tardanza} min`;
     } catch (e) {
         console.error('KPIs:', e);
+        defaultError('Error');
     }
 }
 
@@ -417,11 +432,14 @@ async function cargarTardanzas(fecha) {
     const f = fecha || document.getElementById('kpi-date').value || hoy();
     try {
         const res   = await apiFetch(`${API}/tardanzas?fecha=${f}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+            document.getElementById('tabla-tardanzas').innerHTML =
+                '<tr><td colspan="5" class="text-center py-6 text-red-400 text-xs">Error cargando llegadas tarde</td></tr>';
+            return;
+        }
         const data  = await res.json();
         // Guardar crudo y aplicar filtro de dashboard (<=30 min)
-        tardanzasHoy = data.filter(t => t.tardanza_mins <= TARDANZA_MAX_MINUTOS_DASHBOARD);
-        document.getElementById('search-tardanzas').value = '';
+        tardanzasHoy = Array.isArray(data) ? data.filter(t => t.tardanza_mins <= TARDANZA_MAX_MINUTOS_DASHBOARD) : [];
         renderTardanzas(tardanzasHoy);
         // Refrescar KPIs de tardanza con los datos filtrados
         const presentes = parseInt(document.getElementById('kpi-presentes').textContent, 10) || 0;
@@ -430,7 +448,11 @@ async function cargarTardanzas(fecha) {
         document.getElementById('kpi-tiempo-pct').textContent = `${kpiTardanza.asistencia_a_tiempo_pct}%`;
         document.getElementById('kpi-tiempo-sub').textContent = `${kpiTardanza.llegadas_tarde_pct}% tarde`;
         document.getElementById('kpi-minutos-perdidos').textContent = `${kpiTardanza.minutos_perdidos_tardanza} min`;
-    } catch(e) { console.error('Tardanzas:', e); }
+    } catch(e) {
+        console.error('Tardanzas:', e);
+        document.getElementById('tabla-tardanzas').innerHTML =
+            '<tr><td colspan="5" class="text-center py-6 text-red-400 text-xs">Error conectando con la API</td></tr>';
+    }
 }
 
 function renderTardanzas(lista) {
@@ -451,16 +473,6 @@ function renderTardanzas(lista) {
         </tr>`).join('');
 }
 
-function filtrarTardanzas() {
-    const q = document.getElementById('search-tardanzas').value.toLowerCase().trim();
-    if (!q) {
-        renderTardanzas(tardanzasHoy);
-        return;
-    }
-    const filtrado = tardanzasHoy.filter(t => t.nombre.toLowerCase().includes(q));
-    renderTardanzas(filtrado);
-}
-
 function exportarTardanzasExcel() {
     if (!tardanzasHoy.length) { showToast('No hay llegadas tarde para exportar', 'info'); return; }
     const fecha = document.getElementById('kpi-date').value || hoy();
@@ -475,23 +487,44 @@ async function cargarMarcas() {
     const fecha = document.getElementById('filter-date').value || hoy();
     try {
         const res  = await apiFetch(`${API}/registros?fecha=${fecha}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const tbody = document.getElementById('tabla-marcas');
-        if (!data.length) {
-            tbody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-slate-500 text-xs">Sin marcas en esta fecha</td></tr>';
+        if (!res.ok) {
+            document.getElementById('tabla-marcas').innerHTML =
+                '<tr><td colspan="3" class="text-center py-6 text-red-400 text-xs">Error cargando marcas</td></tr>';
             return;
         }
-        tbody.innerHTML = data.map(r => `
-            <tr>
-                <td class="text-sky-300 font-medium">${r.nombre_empleado || '—'}</td>
-                <td class="font-mono text-slate-300">${r.hora ? String(r.hora).slice(0,5) : '—'}</td>
-                <td class="text-xs text-slate-500">${r.tipo_evento || '—'}</td>
-            </tr>`).join('');
+        const data = await res.json();
+        marcasHoy = Array.isArray(data) ? data : [];
+        document.getElementById('search-marcas').value = '';
+        renderMarcas(marcasHoy);
     } catch(e) {
+        console.error('Marcas:', e);
         document.getElementById('tabla-marcas').innerHTML =
             '<tr><td colspan="3" class="text-center py-6 text-red-400 text-xs">Error conectando con la API</td></tr>';
     }
+}
+
+function renderMarcas(lista) {
+    const tbody = document.getElementById('tabla-marcas');
+    if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="3" class="text-center py-6 text-slate-500 text-xs">Sin marcas en esta fecha</td></tr>';
+        return;
+    }
+    tbody.innerHTML = lista.map(r => `
+        <tr>
+            <td class="text-sky-300 font-medium">${r.nombre_empleado || '—'}</td>
+            <td class="font-mono text-slate-300">${r.hora ? String(r.hora).slice(0,5) : '—'}</td>
+            <td class="text-xs text-slate-500">${r.tipo_evento || '—'}</td>
+        </tr>`).join('');
+}
+
+function filtrarMarcas() {
+    const q = document.getElementById('search-marcas').value.toLowerCase().trim();
+    if (!q) {
+        renderMarcas(marcasHoy);
+        return;
+    }
+    const filtrado = marcasHoy.filter(r => (r.nombre_empleado || '').toLowerCase().includes(q));
+    renderMarcas(filtrado);
 }
 
 async function cargarMarcasDelDia() {
