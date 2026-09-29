@@ -4,7 +4,7 @@ WORKDIR /app
 
 # ── Zona horaria del negocio (Bogotá) ──────────────────────────────────────────
 ENV TZ=America/Bogota
-RUN apt-get update && apt-get install -y tzdata \
+RUN apt-get update && apt-get install -y tzdata wget \
     && ln -snf /usr/share/zoneinfo/$TZ /etc/localtime \
     && echo $TZ > /etc/timezone \
     && rm -rf /var/lib/apt/lists/*

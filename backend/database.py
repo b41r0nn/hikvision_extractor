@@ -14,6 +14,13 @@ if not SQLALCHEMY_DATABASE_URL:
         "contra una BD equivocada."
     )
 
+# SQLAlchemy >= 2.0 intenta usar psycopg 3 por defecto con URLs postgresql://.
+# Forzamos el driver psycopg2 que ya está instalado (psycopg2-binary).
+if SQLALCHEMY_DATABASE_URL.startswith("postgresql://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace(
+        "postgresql://", "postgresql+psycopg2://", 1
+    )
+
 engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

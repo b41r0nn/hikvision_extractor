@@ -18,6 +18,9 @@ config = context.config
 # Override sqlalchemy.url con la variable de entorno
 db_url = os.getenv("DATABASE_URL")
 if db_url:
+    # Forzamos el driver psycopg2 (psycopg2-binary) para SQLAlchemy >= 2.0.
+    if db_url.startswith("postgresql://"):
+        db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
     config.set_main_option("sqlalchemy.url", db_url)
 
 # Interpret the config file for Python logging.
