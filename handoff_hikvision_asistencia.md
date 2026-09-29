@@ -3,8 +3,8 @@
 **Empresa:** REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S (REDIHOS)  
 **Fase:** 3 — Servicio web con PostgreSQL, dashboard, reportes automáticos y panel de administración  
 **Stack:** FastAPI + Uvicorn + PostgreSQL + Nginx + APScheduler + Docker  
-**Última actualización:** 30 de julio de 2026
-**Estado:** Feature `v1.2-smtp-admin` lista para deploy. Guía de migración a Ubuntu Server (`MIGRACION_UBUNTU.md`) y `docker-compose.prod.yml` creados. Backup automático local configurado (`backup.ps1`/`backup.sh`) para prevenir pérdida de datos y `.env`. Pendientes reales antes del deploy: definir IP fija del servidor, dominio DNS exacto, proveedor SMTP y generar/confirmar credenciales de producción (`SECRET_KEY`, `FERNET_KEY`, `ADMIN_PASSWORD`, `POSTGRES_PASSWORD`).
+**Última actualización:** 29 de septiembre de 2026
+**Estado:** Feature `v1.5-ui-historico` deployada a producción (192.168.1.250). Backend, frontend y base de datos healthy. Backup pre-deploy realizado. Pendientes: validación visual en navegador del usuario, configurar cuenta SMTP real en el panel de admin.
 
 ---
 
@@ -766,4 +766,41 @@ Tres cambios aislados, un commit por punto, cada uno con test/grep de evidencia.
 
 Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pérdida de turnos/horarios), pero se resolvió sin daño. El sistema queda operativo y el sprint cerrado hasta producción.
 
-Cuando se retome, sea para configurar el correo real o para arrancar el deploy real en Ubuntu, se sigue el mismo circuito de siempre.
+## Fase 3 (continuación): deploy a producción (29 sep 2026)
+
+| # | Acción | Detalle | Resultado |
+| --- | --- | --- | --- |
+| D.1 | Backup pre-deploy | BD: `/home/sistemas/backups_redihos_prod/hikvision_pre_deploy_v1.5_20260929_163208.sql`; `.env`: `/home/sistemas/backups_redihos_prod/env_pre_deploy_v1.5_20260929_163208`. | ✅ Completado |
+| D.2 | Paquete de deploy | Zip `/tmp/hikvision_asistencia_v1.5.zip` subido al servidor; excluye `.git`, `.env`, `.venv`, `__pycache__`, `pgdata`, `test_evidencia`, `backups`. | ✅ Completado |
+| D.3 | Detener contenedores viejos | `docker compose -f docker-compose.prod.yml down`. | ✅ Completado |
+| D.4 | Desplegar nuevo código | Reemplazo de `/home/sistemas/hikvision_extractor`, restauración de `.env` desde backup. | ✅ Completado |
+| D.5 | Levantar stack | `docker compose -f docker-compose.prod.yml up -d --build`. | ✅ Completado |
+| D.6 | Verificación post-deploy | Backend `/health` → `{"status":"ok"}`; frontend `/` → HTTP 200; contenedores `healthy`. | ✅ Completado |
+
+### Problemas encontrados y soluciones
+
+1. **`ModuleNotFoundError: No module named 'psycopg'`**
+   - Causa: SQLAlchemy 2.1 intenta usar `psycopg` (versión 3) por defecto para URLs `postgresql://`, pero la imagen solo tiene `psycopg2-binary`.
+   - Solución: forzar el driver `postgresql+psycopg2://` en `backend/database.py` y `alembic/env.py` cuando la URL comience con `postgresql://`.
+   - Commit: `02b7b89`.
+
+2. **Healthcheck del backend fallaba por falta de `wget`**
+   - Causa: `docker-compose.prod.yml` usa `wget -qO- http://localhost:8000/health`, pero `python:3.11-slim` no incluye `wget`.
+   - Solución: instalar `wget` en `backend.Dockerfile`.
+   - Commit: `02b7b89`.
+
+### Estado actual del servidor de producción
+
+- **Servidor:** `192.168.1.250`
+- **Path:** `/home/sistemas/hikvision_extractor`
+- **Contenedores:** `hikvision_db` (healthy), `hikvision_backend` (healthy), `hikvision_frontend` (running)
+- **URLs de acceso interno:** `http://localhost:8000/` (backend), `http://localhost:80/` (frontend)
+- **Tag:** `v1.5-ui-historico` apunta al commit `02b7b89`.
+
+### Pendientes post-deploy
+
+1. Validación visual del frontend en navegador (logo SVG, buscadores, pestaña "Histórico de Llegadas Tarde", exportar Excel).
+2. Configurar cuenta SMTP real en el panel de admin y probar envío de correo de prueba.
+3. Monitorear el primer disparo real del scheduler (`extraccion_periodica`, `reporte_semanal`, `reporte_mensual`).
+
+Cuando se retome, sea para configurar el correo real o para nuevos fixes, se sigue el mismo circuito de siempre.
