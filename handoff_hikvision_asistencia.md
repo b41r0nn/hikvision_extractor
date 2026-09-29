@@ -745,6 +745,23 @@ Tres cambios aislados, un commit por punto, cada uno con test/grep de evidencia.
 
 **Limitación conocida (no bloqueante):** `updated_by`/`updated_at` en `usuarios` son genéricos. Hoy solo el endpoint de reset los actualiza (`update_usuario` no los toca), por lo que el timestamp apunta efectivamente al último reset. Pero si en el futuro se empiezan a usar para otros cambios (rol, activo, etc.), el rastro de auditoría del reset se perderá entre otras operaciones. Para trazabilidad completa del evento "reset de contraseña" haría falta una tabla de log separada (ej. `log_auditoria`) con tipo de acción. No es un problema de seguridad; es un detalle de auditoría a resolver más adelante.
 
+## Fase 3: mejoras de UI/UX y reporte de histórico (29 sep 2026)
+
+| # | Cambio | Evidencia | Commit |
+| --- | --- | --- | --- |
+| 3.1 | Logo REDIHOS reemplazado por SVG inline adaptado al fondo oscuro (login + sidebar). | SVG con óvalo azul, líneas naranjas y texto blanco; no depende de `logo.png`. | `8eacc01` |
+| 3.2 | Buscador por nombre en tarjeta **"Llegadas Tarde Hoy"**. | Filtra en tiempo real sobre los datos cargados. | `8eacc01` |
+| 3.3 | Tarjetas "Llegadas Tarde Hoy" y "Marcas del Día" con altura variable (sin `max-h-` ni scroll interno), alineadas en desktop y apiladas en móvil. | CSS ajustado con `items-start` y sin altura fija. | `8eacc01` |
+| 3.4 | Dashboard filtra llegadas tarde > 30 minutos en tarjeta y KPIs; botón para exportar la tarjeta a CSV/Excel. | Lógica en `frontend/app.js` con constante `TARDANZA_MAX_MINUTOS_DASHBOARD = 30`; función `exportarTardanzasExcel()`. | `8eacc01` |
+| 3.5 | Nueva pestaña **"Histórico de Llegadas Tarde"** en Reportes. | Endpoint `GET /api/tardanzas/acumulado?fecha_hasta=YYYY-MM-DD&max_minutos=30`; tabla con `Empleado \| Área \| Minutos Mes \| Días Mes \| Minutos Año \| Días Año`; buscador y exportar a Excel. | `8eacc01` |
+
+**Detalle técnico del endpoint `/api/tardanzas/acumulado`:**
+- Reutiliza `calcular_tardanzas_dia` para cada día laboral entre el inicio del mes/año y `fecha_hasta`.
+- Omite silenciosamente días sin horario configurado (`HorarioNoConfiguradoError`) para no romper el reporte histórico cuando haya gaps de configuración.
+- Filtra tardanzas mayores a `max_minutos` (default 30) para no contaminar el histórico con permisos/largas.
+
+**Test:** `test_evidencia/test_ui_fixes_20260929.py` → **PASS**. Verifica acumulado mensual/anual omitiendo >30 min y endpoint respondiendo 200.
+
 ### Nota de cierre
 
 Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pérdida de turnos/horarios), pero se resolvió sin daño. El sistema queda operativo y el sprint cerrado hasta producción.

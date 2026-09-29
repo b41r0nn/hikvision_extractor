@@ -4,7 +4,7 @@ Esta guía describe paso a paso cómo migrar el sistema de asistencia biométric
 desde el entorno de desarrollo en Windows hacia un servidor **Ubuntu Server**
 usando Docker y Docker Compose en producción.
 
-> **Versión del sistema:** `v1.2-smtp-admin`
+> **Versión del sistema:** `v1.5-ui-historico`
 > **Origen del código:** Windows + Docker Desktop local
 > **Destino:** Ubuntu Server (misma red local que el biométrico Hikvision)
 

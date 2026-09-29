@@ -336,9 +336,10 @@ Puede ejecutarse como script independiente o ser llamado desde el backend.
 - El watchdog lee `BACKFILL_TIMEOUT_SEC` (default 3600 s). Si el backfill
   supera ese tiempo, llama `os._exit(1)` para que Docker lo reinicie.
 
-### 5.3 Extracción diaria programada
+### 5.3 Extracción periódica programada
 
-- A las 8:00 PM el scheduler ejecuta `tarea_extraccion_diaria()`.
+- El scheduler ejecuta `tarea_extraccion_periodica()` cada hora en punto entre
+  las 6:00 AM y las 8:00 PM (`cron hour=6-20, minute=0`).
 - Llama `extractor_hikvision.main()` para el día de hoy.
 - Si termina sin error, actualiza `ultima_extraccion_exitosa` con la hora UTC
   actual.
@@ -359,6 +360,10 @@ Puede ejecutarse como script independiente o ser llamado desde el backend.
 - Si la marca es posterior al límite, se reporta la tardanza en minutos.
 - Si el empleado no tiene turno_id o el turno no tiene horario configurado,
   lanza `HorarioNoConfiguradoError` (falla ruidosa).
+- El dashboard filtra llegadas tarde mayores a 30 minutos para no distorsionar
+  los KPIs con permisos/autorizaciones.
+- El endpoint `GET /api/tardanzas/acumulado` permite obtener el acumulado
+  mensual y anual por empleado, omitiendo tardanzas mayores a 30 minutos.
 
 ### 5.6 Reportes Excel
 
