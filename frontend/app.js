@@ -11,6 +11,8 @@ let currentUser     = null;
 let userPermisos    = [];
 let rolesCache      = [];
 let reportMode      = 'entrada_salida';   // 'entrada_salida' | 'completo'
+let tardanzasHoy    = [];                 // datos crudos filtrados (<=30 min)
+let historicoTardanzas = [];              // datos crudos del histórico
 
 // ── Utilidades ─────────────────────────────────────────────────────────────
 function hoy() {
@@ -34,6 +36,24 @@ function showToast(msg, type = 'info') {
 
 function tienePermiso(nombre) {
     return userPermisos.includes(nombre);
+}
+
+function descargarCSV(rows, filename) {
+    const csv = rows.map(r =>
+        r.map(cell => {
+            const v = String(cell ?? '').replace(/"/g, '""');
+            return /[",\n\r]/.test(v) ? `"${v}"` : v;
+        }).join(',')
+    ).join('\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
 }
 
 async function apiFetch(url, options = {}) {
@@ -200,13 +220,14 @@ function showView(name) {
     if (nav) nav.classList.add('active');
 
     if (name === 'marcas')   cargarMarcasDelDia();
-    if (name === 'reportes') cargarEmpleadosParaReporte();
+    if (name === 'reportes') { showReportTab('generar'); cargarEmpleadosParaReporte(); }
     if (name === 'admin')    cargarAdmin();
 }
 
 function showTab(name) {
     const tabs = ['empleados','turnos','festivos','correo','roles'];
-    document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    const adminTabs = document.getElementById('view-admin').querySelectorAll('.tab-btn');
+    adminTabs.forEach((b, i) => {
         if (i >= tabs.length) return;
         b.classList.toggle('active', tabs[i] === name);
         document.getElementById(`tab-${tabs[i]}`).classList.toggle('active', tabs[i] === name);
@@ -218,11 +239,104 @@ function showTab(name) {
     if (name === 'roles')     cargarUsuariosRoles();
 }
 
+function showReportTab(name) {
+    const tabs = ['generar', 'historico'];
+    tabs.forEach(t => {
+        const btn = document.getElementById(`tab-btn-${t}`);
+        const pane = document.getElementById(`report-tab-${t}`);
+        if (btn) btn.classList.toggle('active', t === name);
+        if (pane) pane.classList.toggle('active', t === name);
+    });
+    if (name === 'historico') {
+        const input = document.getElementById('hist-date');
+        if (input && !input.value) input.value = hoy();
+        cargarHistoricoTardanzas();
+    }
+}
+
+async function cargarHistoricoTardanzas() {
+    const fecha = document.getElementById('hist-date').value || hoy();
+    const tbody = document.getElementById('tabla-historico-tardanzas');
+    tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-500 text-xs">Cargando...</td></tr>';
+    try {
+        const res = await apiFetch(`${API}/tardanzas/acumulado?fecha_hasta=${fecha}&max_minutos=30`);
+        if (!res.ok) {
+            tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-red-400 text-xs">Error consultando histórico</td></tr>';
+            return;
+        }
+        historicoTardanzas = await res.json();
+        document.getElementById('search-historico').value = '';
+        renderHistoricoTardanzas(historicoTardanzas);
+    } catch (e) {
+        console.error('Histórico tardanzas:', e);
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-red-400 text-xs">Error conectando con la API</td></tr>';
+    }
+}
+
+function renderHistoricoTardanzas(lista) {
+    const tbody = document.getElementById('tabla-historico-tardanzas');
+    if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-slate-500 text-xs">Sin llegadas tarde en el período</td></tr>';
+        return;
+    }
+    tbody.innerHTML = lista.map(h => `
+        <tr>
+            <td class="font-medium text-white">${h.nombre}</td>
+            <td><span class="badge-dept">${h.departamento || '—'}</span></td>
+            <td class="text-orange-400 font-mono font-semibold">${h.minutos_mes} min</td>
+            <td class="text-slate-400">${h.dias_mes}</td>
+            <td class="text-orange-400 font-mono font-semibold">${h.minutos_año} min</td>
+            <td class="text-slate-400">${h.dias_año}</td>
+        </tr>`).join('');
+}
+
+function filtrarHistoricoTardanzas() {
+    const q = document.getElementById('search-historico').value.toLowerCase().trim();
+    if (!q) {
+        renderHistoricoTardanzas(historicoTardanzas);
+        return;
+    }
+    const filtrado = historicoTardanzas.filter(h => h.nombre.toLowerCase().includes(q));
+    renderHistoricoTardanzas(filtrado);
+}
+
+function exportarHistoricoExcel() {
+    if (!historicoTardanzas.length) { showToast('No hay histórico para exportar', 'info'); return; }
+    const fecha = document.getElementById('hist-date').value || hoy();
+    const rows = [
+        ['Empleado', 'Área', 'Minutos Mes', 'Días Mes', 'Minutos Año', 'Días Año'],
+        ...historicoTardanzas.map(h => [h.nombre, h.departamento || '—', h.minutos_mes, h.dias_mes, h.minutos_año, h.dias_año])
+    ];
+    descargarCSV(rows, `Historico_Llegadas_Tarde_${fecha}.csv`);
+}
+
 // ── Dashboard ──────────────────────────────────────────────────────────────
 async function cargarDashboard() {
     const fecha = document.getElementById('kpi-date').value || hoy();
     await Promise.all([cargarKPIs(fecha), cargarTardanzas(fecha), cargarMarcas()]);
     await mostrarAvisoExtraccion();
+}
+
+const TARDANZA_MAX_MINUTOS_DASHBOARD = 30;
+
+function calcularKPIsTardanza(tardanzas, empleadosConMarca) {
+    // Llegadas tarde filtradas (<=30 min)
+    const filtradas = tardanzas.filter(t => t.tardanza_mins <= TARDANZA_MAX_MINUTOS_DASHBOARD);
+    const llegadasTarde = filtradas.length;
+    const minutosPerdidos = filtradas.reduce((sum, t) => sum + t.tardanza_mins, 0);
+    const totalConMarca = empleadosConMarca || 0;
+    let llegadasTardePct = 0.0;
+    let asistenciaATiempoPct = 100.0;
+    if (totalConMarca > 0) {
+        llegadasTardePct = parseFloat(((llegadasTarde / totalConMarca) * 100).toFixed(1));
+        asistenciaATiempoPct = parseFloat((((totalConMarca - llegadasTarde) / totalConMarca) * 100).toFixed(1));
+    }
+    return {
+        llegadas_tarde: llegadasTarde,
+        minutos_perdidos_tardanza: minutosPerdidos,
+        llegadas_tarde_pct: llegadasTardePct,
+        asistencia_a_tiempo_pct: asistenciaATiempoPct,
+    };
 }
 
 async function mostrarAvisoExtraccion() {
@@ -287,10 +401,13 @@ async function cargarKPIs(fecha) {
         const data = await res.json();
         document.getElementById('kpi-total').textContent     = data.total_marcaciones   ?? '—';
         document.getElementById('kpi-presentes').textContent = data.empleados_con_marca ?? '—';
-        document.getElementById('kpi-tardanzas').textContent = data.llegadas_tarde      ?? '—';
-        document.getElementById('kpi-tiempo-pct').textContent = data.asistencia_a_tiempo_pct != null ? `${data.asistencia_a_tiempo_pct}%` : '—';
-        document.getElementById('kpi-tiempo-sub').textContent = data.llegadas_tarde_pct != null ? `${data.llegadas_tarde_pct}% tarde` : '—';
-        document.getElementById('kpi-minutos-perdidos').textContent = data.minutos_perdidos_tardanza != null ? `${data.minutos_perdidos_tardanza} min` : '—';
+
+        // Los KPIs de tardanza se calculan con el filtro de <=30 minutos.
+        const kpiTardanza = calcularKPIsTardanza(tardanzasHoy, data.empleados_con_marca);
+        document.getElementById('kpi-tardanzas').textContent = kpiTardanza.llegadas_tarde;
+        document.getElementById('kpi-tiempo-pct').textContent = `${kpiTardanza.asistencia_a_tiempo_pct}%`;
+        document.getElementById('kpi-tiempo-sub').textContent = `${kpiTardanza.llegadas_tarde_pct}% tarde`;
+        document.getElementById('kpi-minutos-perdidos').textContent = `${kpiTardanza.minutos_perdidos_tardanza} min`;
     } catch (e) {
         console.error('KPIs:', e);
     }
@@ -302,22 +419,56 @@ async function cargarTardanzas(fecha) {
         const res   = await apiFetch(`${API}/tardanzas?fecha=${f}`);
         if (!res.ok) return;
         const data  = await res.json();
-        const tbody = document.getElementById('tabla-tardanzas');
-        document.getElementById('tardanzas-count').textContent = `${data.length} empleado(s)`;
-
-        if (!data.length) {
-            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-500 text-xs">Sin llegadas tarde registradas ✓</td></tr>';
-            return;
-        }
-        tbody.innerHTML = data.map(t => `
-            <tr>
-                <td class="font-medium text-white">${t.nombre}</td>
-                <td><span class="badge-dept">${t.departamento || '—'}</span></td>
-                <td class="text-orange-400 font-mono font-semibold">${t.primera_marca}</td>
-                <td class="text-slate-400 font-mono">${t.hora_turno}</td>
-                <td><span class="badge-late">+${t.tardanza_mins} min</span></td>
-            </tr>`).join('');
+        // Guardar crudo y aplicar filtro de dashboard (<=30 min)
+        tardanzasHoy = data.filter(t => t.tardanza_mins <= TARDANZA_MAX_MINUTOS_DASHBOARD);
+        document.getElementById('search-tardanzas').value = '';
+        renderTardanzas(tardanzasHoy);
+        // Refrescar KPIs de tardanza con los datos filtrados
+        const presentes = parseInt(document.getElementById('kpi-presentes').textContent, 10) || 0;
+        const kpiTardanza = calcularKPIsTardanza(tardanzasHoy, presentes);
+        document.getElementById('kpi-tardanzas').textContent = kpiTardanza.llegadas_tarde;
+        document.getElementById('kpi-tiempo-pct').textContent = `${kpiTardanza.asistencia_a_tiempo_pct}%`;
+        document.getElementById('kpi-tiempo-sub').textContent = `${kpiTardanza.llegadas_tarde_pct}% tarde`;
+        document.getElementById('kpi-minutos-perdidos').textContent = `${kpiTardanza.minutos_perdidos_tardanza} min`;
     } catch(e) { console.error('Tardanzas:', e); }
+}
+
+function renderTardanzas(lista) {
+    const tbody = document.getElementById('tabla-tardanzas');
+    document.getElementById('tardanzas-count').textContent = `${lista.length} empleado(s)`;
+
+    if (!lista.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center py-6 text-slate-500 text-xs">Sin llegadas tarde registradas ✓</td></tr>';
+        return;
+    }
+    tbody.innerHTML = lista.map(t => `
+        <tr>
+            <td class="font-medium text-white">${t.nombre}</td>
+            <td><span class="badge-dept">${t.departamento || '—'}</span></td>
+            <td class="text-orange-400 font-mono font-semibold">${t.primera_marca}</td>
+            <td class="text-slate-400 font-mono">${t.hora_turno}</td>
+            <td><span class="badge-late">+${t.tardanza_mins} min</span></td>
+        </tr>`).join('');
+}
+
+function filtrarTardanzas() {
+    const q = document.getElementById('search-tardanzas').value.toLowerCase().trim();
+    if (!q) {
+        renderTardanzas(tardanzasHoy);
+        return;
+    }
+    const filtrado = tardanzasHoy.filter(t => t.nombre.toLowerCase().includes(q));
+    renderTardanzas(filtrado);
+}
+
+function exportarTardanzasExcel() {
+    if (!tardanzasHoy.length) { showToast('No hay llegadas tarde para exportar', 'info'); return; }
+    const fecha = document.getElementById('kpi-date').value || hoy();
+    const rows = [
+        ['Empleado', 'Área', 'Llegó', 'Turno', '+ Min'],
+        ...tardanzasHoy.map(t => [t.nombre, t.departamento || '—', t.primera_marca, t.hora_turno, `+${t.tardanza_mins} min`])
+    ];
+    descargarCSV(rows, `Llegadas_Tarde_${fecha}.csv`);
 }
 
 async function cargarMarcas() {

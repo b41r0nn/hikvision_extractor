@@ -111,7 +111,22 @@
 <div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center" style="background: radial-gradient(ellipse at 20% 20%, rgba(30,64,175,0.25) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(124,58,237,0.15) 0%, transparent 60%), #0b1120;">
     <div class="glass p-8 w-full max-w-sm space-y-6">
         <div class="text-center">
-            <img src="logo.png" alt="Logo REDIHOS" class="h-16 mx-auto mb-4 opacity-90">
+            <div class="flex justify-center mb-4">
+                <svg viewBox="0 0 240 100" class="h-16 w-auto" aria-label="Logo REDIHOS">
+                    <defs>
+                        <linearGradient id="ovalGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#0056A8"/>
+                            <stop offset="100%" stop-color="#003D7A"/>
+                        </linearGradient>
+                    </defs>
+                    <ellipse cx="120" cy="45" rx="115" ry="42" fill="url(#ovalGrad)" stroke="#004C99" stroke-width="2"/>
+                    <path d="M55 60 C 45 30, 70 15, 90 25 C 75 35, 70 50, 85 65" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M80 62 C 68 28, 95 12, 118 22 C 100 34, 95 52, 112 66" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
+                    <path d="M105 64 C 92 28, 120 12, 145 22 C 126 34, 122 54, 140 67" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
+                    <text x="120" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="bold" fill="white" letter-spacing="1">REDIHOS</text>
+                    <text x="198" y="60" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="normal" fill="white">S.A.S.</text>
+                </svg>
+            </div>
             <h1 class="text-xl font-bold text-white">Sistema de Asistencia</h1>
             <p class="text-xs text-slate-400 mt-1">REDIHOS S.A.S.</p>
         </div>
@@ -159,7 +174,22 @@
 <!-- SIDEBAR -->
 <nav id="sidebar" class="flex flex-col p-4 pt-6 flex-shrink-0">
     <div class="mb-8 px-2">
-        <img id="logo" src="logo.png" alt="Logo REDIHOS" class="h-16 mb-2 opacity-90">
+        <div class="mb-2">
+            <svg viewBox="0 0 240 100" class="h-14 w-auto" aria-label="Logo REDIHOS">
+                <defs>
+                    <linearGradient id="ovalGradSidebar" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#0056A8"/>
+                        <stop offset="100%" stop-color="#003D7A"/>
+                    </linearGradient>
+                </defs>
+                <ellipse cx="120" cy="45" rx="115" ry="42" fill="url(#ovalGradSidebar)" stroke="#004C99" stroke-width="2"/>
+                <path d="M55 60 C 45 30, 70 15, 90 25 C 75 35, 70 50, 85 65" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
+                <path d="M80 62 C 68 28, 95 12, 118 22 C 100 34, 95 52, 112 66" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
+                <path d="M105 64 C 92 28, 120 12, 145 22 C 126 34, 122 54, 140 67" fill="none" stroke="#F36F21" stroke-width="5" stroke-linecap="round"/>
+                <text x="120" y="50" text-anchor="middle" font-family="Arial, sans-serif" font-size="34" font-weight="bold" fill="white" letter-spacing="1">REDIHOS</text>
+                <text x="198" y="60" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="normal" fill="white">S.A.S.</text>
+            </svg>
+        </div>
         <h1 class="text-base font-bold text-white leading-tight">Sistema de Asistencia</h1>
         <p class="text-xs text-slate-500 mt-0.5">REDIHOS S.A.S.</p>
     </div>
@@ -265,14 +295,23 @@
         </div>
 
         <!-- Tarde hoy + Marcas del día (2 columnas) -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
             <!-- Llegadas tarde -->
             <div class="glass p-0 overflow-hidden">
-                <div class="px-6 py-4 border-b border-slate-700/50 flex items-center justify-between">
-                    <h3 class="font-semibold text-white text-sm">Llegadas Tarde Hoy</h3>
-                    <span class="text-xs text-slate-500" id="tardanzas-count"></span>
+                <div class="px-6 py-4 border-b border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                        <h3 class="font-semibold text-white text-sm">Llegadas Tarde Hoy</h3>
+                        <span class="text-xs text-slate-500" id="tardanzas-count"></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="search-tardanzas" placeholder="Buscar empleado..."
+                               class="form-input w-40 text-xs py-1.5" oninput="filtrarTardanzas()">
+                        <button onclick="exportarTardanzasExcel()" class="btn-secondary text-xs py-1.5 px-2" title="Exportar a Excel">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        </button>
+                    </div>
                 </div>
-                <div class="overflow-auto max-h-72">
+                <div class="overflow-auto">
                     <table class="data-table">
                         <thead><tr>
                             <th>Empleado</th>
@@ -295,7 +334,7 @@
                     <input type="date" id="filter-date" onchange="cargarMarcas()"
                            class="form-input w-36 text-xs py-1">
                 </div>
-                <div class="overflow-auto max-h-72">
+                <div class="overflow-auto">
                     <table class="data-table">
                         <thead><tr>
                             <th>Empleado</th>
@@ -345,57 +384,102 @@
     <!-- VISTA: REPORTES                                                        -->
     <!-- ══════════════════════════════════════════════════════════════════════ -->
     <div id="view-reportes" class="hidden space-y-6">
-        <div class="mb-6">
-            <h2 class="text-2xl font-bold text-white">Generar Reporte</h2>
-            <p class="text-slate-400 text-sm mt-0.5">Exporta a Excel con el formato dinámico de marcas</p>
+        <div class="mb-2">
+            <h2 class="text-2xl font-bold text-white">Reportes</h2>
+            <p class="text-slate-400 text-sm mt-0.5">Genera informes y consulta el histórico de llegadas tarde</p>
         </div>
 
-        <div class="glass p-6 space-y-6">
-            <!-- Fechas -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="form-label">Fecha de inicio</label>
-                    <input type="date" id="rep-start" class="form-input">
-                </div>
-                <div>
-                    <label class="form-label">Fecha de fin</label>
-                    <input type="date" id="rep-end" class="form-input">
-                </div>
-            </div>
+        <!-- Tabs de reportes -->
+        <div class="border-b border-slate-700">
+            <button class="tab-btn active" onclick="showReportTab('generar')" id="tab-btn-generar">Generar Reporte</button>
+            <button class="tab-btn"        onclick="showReportTab('historico')" id="tab-btn-historico">Histórico de Llegadas Tarde</button>
+        </div>
 
-            <!-- Filtro por departamento -->
-            <div>
-                <label class="form-label">Filtrar por área / departamento (opcional)</label>
-                <div id="dept-filter-list" class="flex flex-wrap gap-2 mt-1"></div>
-            </div>
-
-            <!-- Modo de reporte -->
-            <div class="flex items-center justify-between">
-                <label class="form-label mb-0">Modo del reporte</label>
-                <button id="btn-toggle-modo" onclick="toggleReportMode()" class="btn-secondary text-xs py-1.5 px-3">
-                    Entrada / Salida
-                </button>
-            </div>
-
-            <!-- Selección de empleados -->
-            <div>
-                <div class="flex items-center justify-between mb-2">
-                    <label class="form-label mb-0">Selección de empleados</label>
-                    <div class="flex gap-2">
-                        <button onclick="seleccionarTodos(true)"  class="btn-success text-xs py-1 px-3">Todos</button>
-                        <button onclick="seleccionarTodos(false)" class="btn-danger  text-xs py-1 px-3">Ninguno</button>
+        <!-- TAB: Generar Reporte -->
+        <div id="report-tab-generar" class="tab-content active space-y-6">
+            <div class="glass p-6 space-y-6">
+                <!-- Fechas -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="form-label">Fecha de inicio</label>
+                        <input type="date" id="rep-start" class="form-input">
+                    </div>
+                    <div>
+                        <label class="form-label">Fecha de fin</label>
+                        <input type="date" id="rep-end" class="form-input">
                     </div>
                 </div>
-                <input type="text" id="search-emp" placeholder="Buscar empleado..."
-                       class="form-input mb-2" oninput="filtrarListaEmpleados()">
-                <div id="emp-list" class="border border-slate-700/50 rounded-lg overflow-auto max-h-52 divide-y divide-slate-800/50 bg-slate-900/30"></div>
-            </div>
 
-            <button onclick="generarReporte()" class="btn-primary w-full justify-center py-3 text-sm" id="btn-generar">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
-                Generar y Descargar Excel
-            </button>
-        </div>
+                <!-- Filtro por departamento -->
+                <div>
+                    <label class="form-label">Filtrar por área / departamento (opcional)</label>
+                    <div id="dept-filter-list" class="flex flex-wrap gap-2 mt-1"></div>
+                </div>
+
+                <!-- Modo de reporte -->
+                <div class="flex items-center justify-between">
+                    <label class="form-label mb-0">Modo del reporte</label>
+                    <button id="btn-toggle-modo" onclick="toggleReportMode()" class="btn-secondary text-xs py-1.5 px-3">
+                        Entrada / Salida
+                    </button>
+                </div>
+
+                <!-- Selección de empleados -->
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="form-label mb-0">Selección de empleados</label>
+                        <div class="flex gap-2">
+                            <button onclick="seleccionarTodos(true)"  class="btn-success text-xs py-1 px-3">Todos</button>
+                            <button onclick="seleccionarTodos(false)" class="btn-danger  text-xs py-1 px-3">Ninguno</button>
+                        </div>
+                    </div>
+                    <input type="text" id="search-emp" placeholder="Buscar empleado..."
+                           class="form-input mb-2" oninput="filtrarListaEmpleados()">
+                    <div id="emp-list" class="border border-slate-700/50 rounded-lg overflow-auto max-h-52 divide-y divide-slate-800/50 bg-slate-900/30"></div>
+                </div>
+
+                <button onclick="generarReporte()" class="btn-primary w-full justify-center py-3 text-sm" id="btn-generar">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Generar y Descargar Excel
+                </button>
+            </div>
+        </div><!-- /tab generar -->
+
+        <!-- TAB: Histórico de Llegadas Tarde -->
+        <div id="report-tab-historico" class="tab-content space-y-6">
+            <div class="glass p-6 space-y-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h3 class="font-semibold text-white text-sm">Histórico de Llegadas Tarde</h3>
+                        <p class="text-xs text-slate-400">Acumulado mensual y anual por empleado. Se omiten llegadas tarde superiores a 30 minutos.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <input type="date" id="hist-date" class="form-input w-40" onchange="cargarHistoricoTardanzas()">
+                        <input type="text" id="search-historico" placeholder="Buscar empleado..."
+                               class="form-input w-44 text-xs" oninput="filtrarHistoricoTardanzas()">
+                        <button onclick="exportarHistoricoExcel()" class="btn-secondary text-xs py-2 px-3">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                            Excel
+                        </button>
+                    </div>
+                </div>
+                <div class="overflow-auto">
+                    <table class="data-table">
+                        <thead><tr>
+                            <th>Empleado</th>
+                            <th>Área</th>
+                            <th>Minutos Mes</th>
+                            <th>Días Mes</th>
+                            <th>Minutos Año</th>
+                            <th>Días Año</th>
+                        </tr></thead>
+                        <tbody id="tabla-historico-tardanzas">
+                            <tr><td colspan="6" class="text-center py-8 text-slate-500 text-xs">Selecciona una fecha para consultar</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div><!-- /tab historico -->
     </div><!-- /reportes -->
 
     <!-- ══════════════════════════════════════════════════════════════════════ -->

@@ -21,7 +21,11 @@ from sqlalchemy.orm import Session
 from . import models
 from .database import engine, get_db, SessionLocal
 from .scheduler import start_scheduler
-from .report_service import generar_reporte, calcular_tardanzas_dia, get_festivos, es_dia_laboral, init_festivos, obtener_horario_vigente, HorarioNoConfiguradoError
+from .report_service import (
+    generar_reporte, calcular_tardanzas_dia, calcular_tardanzas_acumulado,
+    get_festivos, es_dia_laboral, init_festivos, obtener_horario_vigente,
+    HorarioNoConfiguradoError,
+)
 from .email_service import enviar_correo_prueba_a, CorreoNoConfiguradoError
 from .sync_empleados import sync_empleados
 from .auth import (
@@ -752,6 +756,22 @@ def get_tardanzas(
 ):
     dia = fecha or hoy_bogota()
     return calcular_tardanzas_dia(db, dia)
+
+
+@app.get("/api/tardanzas/acumulado")
+def get_tardanzas_acumulado(
+    fecha_hasta: Optional[date] = None,
+    max_minutos: int = 30,
+    db: Session = Depends(get_db),
+    user: models.Usuario = Depends(require_perm("ver_dashboard")),
+):
+    """
+    Acumulado de minutos de tardanza por empleado para el mes y año de la fecha
+    dada. Por defecto omite llegadas tarde mayores a 30 minutos.
+    """
+    hasta = fecha_hasta or hoy_bogota()
+    return calcular_tardanzas_acumulado(db, hasta, max_minutos=max_minutos)
+
 
 @app.get("/api/registros")
 def read_registros(

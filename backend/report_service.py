@@ -522,3 +522,65 @@ def calcular_tardanzas_dia(db: Session, dia: date) -> List[dict]:
             })
 
     return sorted(tardanzas, key=lambda x: x["tardanza_mins"], reverse=True)
+
+
+def calcular_tardanzas_acumulado(
+    db: Session,
+    fecha_hasta: date,
+    max_minutos: int = 30,
+) -> List[dict]:
+    """
+    Retorna acumulado de minutos de tardanza por empleado para el mes y el año
+    de `fecha_hasta`. Solo suma tardanzas <= max_minutos. Los días sin horario
+    configurado se omiten silenciosamente en lugar de abortar el cálculo.
+
+    Columnas devueltas:
+      - nombre
+      - departamento
+      - minutos_mes
+      - dias_mes
+      - minutos_año
+      - dias_año
+    """
+    inicio_mes = fecha_hasta.replace(day=1)
+    inicio_año = fecha_hasta.replace(month=1, day=1)
+
+    festivos_mes = get_festivos(inicio_mes, fecha_hasta)
+    festivos_año = get_festivos(inicio_año, fecha_hasta)
+
+    dias_mes = get_dias_rango(inicio_mes, fecha_hasta, festivos_mes)
+    dias_año = get_dias_rango(inicio_año, fecha_hasta, festivos_año)
+
+    acum = {}
+
+    def _procesar_dia(dia: date):
+        try:
+            tardanzas = calcular_tardanzas_dia(db, dia)
+        except HorarioNoConfiguradoError:
+            # Día sin horario configurado: no suma ni aborta.
+            return
+        for t in tardanzas:
+            if t["tardanza_mins"] > max_minutos:
+                continue
+            nombre = t["nombre"]
+            if nombre not in acum:
+                acum[nombre] = {
+                    "nombre":       nombre,
+                    "departamento": t["departamento"] or "—",
+                    "minutos_mes":  0,
+                    "dias_mes":     0,
+                    "minutos_año":  0,
+                    "dias_año":     0,
+                }
+            acum[nombre]["minutos_año"] += t["tardanza_mins"]
+            acum[nombre]["dias_año"]     += 1
+            if dia in dias_mes:
+                acum[nombre]["minutos_mes"] += t["tardanza_mins"]
+                acum[nombre]["dias_mes"]     += 1
+
+    # Procesar todos los días del año (el acumulado de mes se deriva del mismo loop)
+    for dia in dias_año:
+        _procesar_dia(dia)
+
+    return sorted(acum.values(), key=lambda x: x["minutos_año"], reverse=True)
+
