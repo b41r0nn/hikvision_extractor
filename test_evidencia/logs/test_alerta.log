@@ -1,9 +1,0 @@
-Aplicando migraciones de Alembic...
-[MIGRACIONES] Alembic upgrade head aplicado correctamente.
-Iniciando inicialización de datos...
-[FESTIVOS] 0 festivos poblados desde la librería holidays.
-[RBAC] Roles y permisos inicializados.
-[CONFIG] Configuración por defecto inicializada.
-[BACKFILL] Ultima extraccion es hoy; no se requiere relleno.
-Iniciando scheduler de tareas en segundo plano...
-[SCHEDULER] Scheduler iniciado. Jobs: sync_empleados_diaria, extraccion_diaria, reporte_semanal, reporte_mensual.
