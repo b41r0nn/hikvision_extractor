@@ -266,15 +266,14 @@ def main(start_str=None, end_str=None, progress_callback=None):
             except DeviceUnavailableError as e:
                 # Falla de red real: el día actual NO se pudo obtener.
                 # Hacemos rollback de lo que estuviera pendiente y detenemos
-                # el avance. Los días anteriores ya commiteados se conservan;
-                # el llamador (main.py) NO debe actualizar ultima_extraccion
-                # a algo posterior al último día exitoso.
+                # el avance. Los días anteriores ya fueron commiteados y se
+                # conservan; el llamador (main.py) NO debe actualizar
+                # ultima_extraccion a algo posterior al último día exitoso.
                 msg = f"  [ERROR] {current}: {e} -> deteniendo bucle"
                 print(msg)
                 if progress_callback:
                     progress_callback(msg)
                 db.rollback()
-                db.close()
                 raise
 
             evts  = parse_events(raw, current)
@@ -299,11 +298,15 @@ def main(start_str=None, end_str=None, progress_callback=None):
                 # Si había una alerta previa y ahora se completó, limpiarla
                 config_service.clear_alerta_extraccion(db, current)
 
+            # Commit por día: si falla un día posterior, los anteriores ya
+            # están persistidos. El dedup por (nombre, fecha, hora) permite
+            # reintentar el rango completo sin duplicados.
+            db.commit()
+
             current += timedelta(days=1)
 
-        db.commit()
     except DeviceUnavailableError:
-        # Ya cerramos la sesión y rollbackeamos dentro del bucle.
+        # El rollback/cierre ya se manejó donde ocurrió la excepción.
         raise
     except Exception as e:
         print(f"Error procesando {current}: {e}")
