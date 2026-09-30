@@ -276,9 +276,9 @@
         </div>
 
         <!-- Tarde hoy + Marcas del día (2 columnas) -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
             <!-- Llegadas tarde -->
-            <div class="glass p-0 overflow-hidden">
+            <div class="glass p-0 overflow-hidden flex flex-col h-[55vh]">
                 <div class="px-6 py-4 border-b border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h3 class="font-semibold text-white text-sm">Llegadas Tarde Hoy</h3>
@@ -288,7 +288,7 @@
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     </button>
                 </div>
-                <div class="overflow-auto">
+                <div class="overflow-y-auto custom-scroll flex-1">
                     <table class="data-table">
                         <thead><tr>
                             <th>Empleado</th>
@@ -305,7 +305,7 @@
             </div>
 
             <!-- Marcas del día -->
-            <div class="glass p-0 overflow-hidden flex flex-col">
+            <div class="glass p-0 overflow-hidden flex flex-col h-[55vh]">
                 <div class="px-6 py-4 border-b border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <h3 class="font-semibold text-white text-sm">Marcas del Día</h3>
                     <div class="flex items-center gap-2">
@@ -315,7 +315,7 @@
                                class="form-input w-36 text-xs py-1.5">
                     </div>
                 </div>
-                <div class="overflow-y-auto custom-scroll" style="max-height: 55vh;">
+                <div class="overflow-y-auto custom-scroll flex-1">
                     <table class="data-table">
                         <thead><tr>
                             <th>Empleado</th>
