@@ -867,15 +867,16 @@ def update_empleado(
     if not obj:
         raise HTTPException(status_code=404, detail="Empleado no encontrado.")
 
-    obj.departamento = emp.departamento
-    obj.activo       = emp.activo
+    if emp.departamento is not None:
+        obj.departamento = emp.departamento
+    obj.activo = emp.activo
     if emp.turno_id is not None:
         turno = db.query(models.Turno).filter(models.Turno.id == emp.turno_id).first()
         if not turno:
             raise HTTPException(status_code=400, detail="Turno no encontrado.")
         obj.turno_id = emp.turno_id
-    else:
-        obj.turno_id = None
+    # Si turno_id es None, no se toca: evita borrar el turno asignado cuando
+    # el cliente solo quiere cambiar departamento o activo.
 
     db.commit()
     db.refresh(obj)
@@ -1126,6 +1127,14 @@ def delete_turno(
     obj = db.query(models.Turno).filter(models.Turno.id == turno_id).first()
     if not obj:
         raise HTTPException(status_code=404, detail="Turno no encontrado.")
+    empleados_asignados = db.query(models.Empleado).filter(
+        models.Empleado.turno_id == turno_id
+    ).count()
+    if empleados_asignados > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No se puede eliminar el turno: tiene {empleados_asignados} empleado(s) asignado(s).",
+        )
     db.delete(obj)
     db.commit()
 
