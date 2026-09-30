@@ -148,8 +148,12 @@ def obtener_horario_vigente(
 ) -> tuple:
     """
     Retorna (hora_entrada, tolerancia_minutos) vigentes para un turno, día de
-    semana y fecha dados. Si no hay fila configurada, lanza
-    HorarioNoConfiguradoError.
+    semana y fecha dados.
+
+    Primero busca un horario con vigente_desde <= fecha. Si no existe (p.ej.
+    datos históricos anteriores a la primera fecha de vigencia cargada), usa
+    el horario más antiguo disponible para ese turno/día. Si no hay ninguna
+    fila, lanza HorarioNoConfiguradoError.
 
     dia_semana: 0=lunes, 1=martes, ..., 4=viernes.
     """
@@ -163,6 +167,19 @@ def obtener_horario_vigente(
         .order_by(TurnoHorario.vigente_desde.desc())
         .first()
     )
+    if horario is None:
+        # Fallback: usar el horario más antiguo configurado para ese turno/día.
+        # Esto permite calcular tardanzas históricas antes de la primera fecha
+        # de vigencia sin perder la funcionalidad de versionado.
+        horario = (
+            db.query(TurnoHorario)
+            .filter(
+                TurnoHorario.turno_id == turno_id,
+                TurnoHorario.dia_semana == dia_semana,
+            )
+            .order_by(TurnoHorario.vigente_desde.asc())
+            .first()
+        )
     if horario is None:
         raise HorarioNoConfiguradoError(
             f"Turno {turno_id} no tiene horario configurado para "
