@@ -758,6 +758,16 @@ Tres cambios aislados, un commit por punto, cada uno con test/grep de evidencia.
 | 3.7 | Tarjetas **"Llegadas Tarde Hoy"** y **"Marcas del Día"** del dashboard con la misma altura (`h-[55vh]`) y scroll interno. | Grid usa `items-stretch`; ambas tarjetas usan `flex flex-col` y el tbody crece solo dentro del viewport. | `4564847` |
 | 3.8 | Histórico de llegadas tarde ahora trae datos de meses anteriores a la primera fecha de vigencia de `turno_horario`. | `obtener_horario_vigente` hace fallback al horario más antiguo cuando no hay uno vigente para la fecha consultada. | `9e8567c` |
 | 3.9 | Nuevo permiso `ver_historico_tardanzas` para controlar acceso al histórico de llegadas tarde. | Se agrega a `PERMISOS`, se asigna al rol `Reportes`, se protege `/api/tardanzas/acumulado` y se oculta la pestaña en el frontend si no se tiene el permiso. | `c2fd2d6` |
+| 3.10 | Backfill commitea día por día para no perder progreso ante fallo o watchdog. | `extractor_hikvision.main()` hace `db.commit()` por día exitoso; los días anteriores se conservan si un día posterior falla. | `69b2dd7` |
+| 3.11 | `.dockerignore` agregado y `frontend.Dockerfile` restringido a `frontend/`. | Evita que `.env`, `.git`, `test_evidencia/`, secretos y archivos de desarrollo entren en las imágenes Docker. | `dd29dd2` |
+| 3.12 | `SECRET_KEY` ahora es fail-loud; secretos removidos de `.env.example`; `test_evidencia/` eliminado del tracking. | `SECRET_KEY` sin default inseguro; placeholders `<...>` en `.env.example`; `git rm --cached test_evidencia/`. | `b6e565b` |
+| 3.13 | `init_rbac()` ya no sobrescribe permisos del rol `Reportes`. | Solo asegura el mínimo de permisos (`ver_dashboard`, `generar_reportes`, `ver_historico_tardanzas`) sin borrar permisos adicionales asignados desde la UI. | `98f1ad6` |
+| 3.14 | Lock global de extracción (`backend/extraction_lock.py`). | Scheduler, backfill de arranque y extracción manual comparten un `threading.Lock`; no se ejecutan simultáneamente. | `28b5d75` |
+| 3.15 | Validaciones en API de empleados y turnos. | `DELETE /api/turnos/{id}` rechaza si tiene empleados asignados; `PUT /api/empleados/{id}` no anula `turno_id` cuando el campo no se envía. | `6a3f675` |
+| 3.16 | Sanitización de `innerHTML` en frontend contra XSS. | Nuevo helper `escapeHtml()`; se escapan nombres de empleados, departamentos, turnos, usuarios, roles y datos de festivos/marcas antes de insertarlos en el DOM. | `90c70f7` |
+| 3.17 | Optimización de `/api/tardanzas/acumulado`. | Cachea objetos `holidays` por años; precarga empleados y horarios en memoria para evitar N+1 en el cálculo del acumulado. | `5cc6e7e` |
+| 3.18 | Joins de reportes y tardanzas usan `empleado_id` en lugar de `nombre_empleado`. | Evita perder histórico si cambia el nombre en el biométrico y separa homónimos. | `df8e1b4` |
+| 3.19 | Umbral de alerta de extracción atrasada corregido y endpoint de correo prueba legacy reparado. | Alerta ahora a las 3h (extracción horaria); `/api/configuracion/correo/prueba` usa `enviar_correo_prueba()` con destinatarios configurados. | `55cc668` |
 
 **Detalle técnico del endpoint `/api/tardanzas/acumulado`:**
 - Reutiliza `calcular_tardanzas_dia` para cada día laboral entre el inicio del mes/año y `fecha_hasta`.
@@ -800,7 +810,7 @@ Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pér
 - **Path:** `/home/sistemas/hikvision_extractor`
 - **Contenedores:** `hikvision_db` (healthy), `hikvision_backend` (healthy), `hikvision_frontend` (running)
 - **URLs de acceso interno:** `http://localhost:8000/` (backend), `http://localhost:80/` (frontend)
-- **Tag:** `v1.5-ui-historico` apunta al commit `c2fd2d6`.
+- **Tag:** `v1.5-ui-historico` apunta al commit `55cc668`.
 
 ### Pendientes post-deploy
 
