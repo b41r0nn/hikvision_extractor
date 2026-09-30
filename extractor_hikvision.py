@@ -175,12 +175,21 @@ def save_to_db(db, new_events, include_all=False):
             fecha = e.get("Event Date")
             hora = e.get("Event Time")
             
-            # Chequear si ya existe para no duplicar (usando empleado, fecha, hora)
-            existe = db.query(RegistroAsistencia).filter(
-                RegistroAsistencia.nombre_empleado == nombre,
-                RegistroAsistencia.fecha == fecha,
-                RegistroAsistencia.hora == hora
-            ).first()
+            # Dedup por empleado_id + fecha + hora (consistente con el resto del sistema).
+            # Si no hay empleado_id, se cae al fallback por nombre para no perder el registro.
+            emp_id = e.get("Employee ID", "").strip()
+            if emp_id:
+                existe = db.query(RegistroAsistencia).filter(
+                    RegistroAsistencia.empleado_id == emp_id,
+                    RegistroAsistencia.fecha == fecha,
+                    RegistroAsistencia.hora == hora
+                ).first()
+            else:
+                existe = db.query(RegistroAsistencia).filter(
+                    RegistroAsistencia.nombre_empleado == nombre,
+                    RegistroAsistencia.fecha == fecha,
+                    RegistroAsistencia.hora == hora
+                ).first()
             
             if not existe:
                 registro = RegistroAsistencia(
