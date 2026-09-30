@@ -193,7 +193,7 @@ def save_to_db(db, new_events, include_all=False):
             
             if not existe:
                 registro = RegistroAsistencia(
-                    empleado_id=e.get("Employee ID"),
+                    empleado_id=emp_id or None,
                     nombre_empleado=nombre,
                     fecha=fecha,
                     hora=hora,
