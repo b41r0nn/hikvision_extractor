@@ -50,10 +50,18 @@ def _hdr(ws, row, col, value, width=None, size=10, bg=HDR_BLUE):
 
 
 import holidays
+from functools import lru_cache
 
 # ── Lógica de festivos y días laborales ───────────────────────────────────────
+@lru_cache(maxsize=16)
+def _co_holidays_for_years(years_tuple: tuple) -> holidays.HolidayBase:
+    """Cachea el objeto holidays por conjunto de años."""
+    return holidays.country_holidays('CO', years=years_tuple)
+
+
 def get_festivos(start: date, end: date) -> set:
-    co_holidays = holidays.country_holidays('CO', years=range(start.year, end.year + 1))
+    years = tuple(range(start.year, end.year + 1))
+    co_holidays = _co_holidays_for_years(years)
     return {d for d in co_holidays if start <= d <= end}
 
 
@@ -195,6 +203,39 @@ def calcular_tardanza(primera_marca: time, hora_turno: time, tolerancia: int) ->
     llegada = datetime.combine(hoy_bogota(), primera_marca)
     delta   = (llegada - limite).total_seconds() / 60
     return int(delta) if delta > 0 else None
+
+
+def _precargar_horarios(db: Session) -> dict:
+    """Precarga todos los turno_horario en un dict indexado por (turno_id, dia_semana)."""
+    cache = defaultdict(list)
+    for h in db.query(TurnoHorario).all():
+        cache[(h.turno_id, h.dia_semana)].append(
+            (h.vigente_desde, h.hora_entrada, h.tolerancia_minutos)
+        )
+    # Orden descendente por vigente_desde para encontrar el más reciente <= fecha.
+    for k in cache:
+        cache[k].sort(key=lambda x: x[0], reverse=True)
+    return cache
+
+
+def _obtener_horario_vigente_cache(
+    cache: dict,
+    turno_id: int,
+    dia_semana: int,
+    fecha: date,
+) -> tuple:
+    """Versión en memoria de obtener_horario_vigente usando el cache precargado."""
+    lista = cache.get((turno_id, dia_semana), [])
+    for vigente_desde, hora_entrada, tolerancia in lista:
+        if vigente_desde <= fecha:
+            return hora_entrada, tolerancia
+    # Fallback: usar el horario más antiguo disponible.
+    if lista:
+        return lista[-1][1], lista[-1][2]
+    raise HorarioNoConfiguradoError(
+        f"Turno {turno_id} no tiene horario configurado para "
+        f"dia_semana={dia_semana} vigente desde {fecha}"
+    )
 
 
 # ── Motor principal del informe ────────────────────────────────────────────────
@@ -484,7 +525,12 @@ def _build_ws_completo(ws, dias_laborales, empleados_sorted, pivot,
 
 
 # ── Tardanzas del día ─────────────────────────────────────────────────────────
-def calcular_tardanzas_dia(db: Session, dia: date) -> List[dict]:
+def calcular_tardanzas_dia(
+    db: Session,
+    dia: date,
+    empleados_cache: Optional[dict] = None,
+    horarios_cache: Optional[dict] = None,
+) -> List[dict]:
     """
     Retorna lista de dicts con empleados registrados que llegaron tarde ese día.
     Ignora marcas de personas no asociadas a un Empleado.
@@ -492,8 +538,13 @@ def calcular_tardanzas_dia(db: Session, dia: date) -> List[dict]:
     Desde la Fase A del versionado de horarios, la fuente de verdad es la
     tabla turno_horario. No hay fallback a DEFAULT_TURNO_ENTRADA ni a horario
     individual en la tabla empleados. Si un empleado no tiene turno_id o su
-    turno no tiene horario para el día, se lanza HorarioNoConfiguradoError.
-    """
+    turno no tiene horario para el día, se omite silenciosamente.
+
+    Args:
+        empleados_cache: dict opcional {nombre: Empleado} para evitar N+1.
+        horarios_cache: dict opcional {(turno_id, dia_semana): [...]} para
+                        evitar una query por empleado/día.
+    """"
     festivos = get_festivos(dia, dia)
     if not es_dia_laboral(dia, festivos):
         return []
@@ -508,8 +559,11 @@ def calcular_tardanzas_dia(db: Session, dia: date) -> List[dict]:
         if r.nombre_empleado not in primeras:
             primeras[r.nombre_empleado] = r.hora
 
-    # Buscar turno de cada empleado
-    empleados = {e.nombre: e for e in db.query(Empleado).all()}
+    # Buscar turno de cada empleado (usar cache si se proporciona)
+    if empleados_cache is None:
+        empleados = {e.nombre: e for e in db.query(Empleado).all()}
+    else:
+        empleados = empleados_cache
     tardanzas = []
 
     for nombre, primera_hora in primeras.items():
@@ -519,15 +573,18 @@ def calcular_tardanzas_dia(db: Session, dia: date) -> List[dict]:
             continue
 
         # Omitir silenciosamente si no tiene turno o no tiene horario vigente.
-        # Antes se lanzaba HorarioNoConfiguradoError, pero eso rompía el dashboard
-        # para fechas históricas donde aún no se habían versionado los horarios.
         if emp.turno_id is None:
             continue
 
         try:
-            hora_turno, tolerancia = obtener_horario_vigente(
-                db, emp.turno_id, dia.weekday(), dia
-            )
+            if horarios_cache is None:
+                hora_turno, tolerancia = obtener_horario_vigente(
+                    db, emp.turno_id, dia.weekday(), dia
+                )
+            else:
+                hora_turno, tolerancia = _obtener_horario_vigente_cache(
+                    horarios_cache, emp.turno_id, dia.weekday(), dia
+                )
         except HorarioNoConfiguradoError:
             continue
 
@@ -536,7 +593,7 @@ def calcular_tardanzas_dia(db: Session, dia: date) -> List[dict]:
             tardanzas.append({
                 "nombre":        nombre,
                 "departamento":  emp.departamento,
-                "primera_marca": primera_hora.strftime("%H:%M") if primera_hora else "--",
+                "primera_marca": primera_hora.strftime("%H:%M"),
                 "hora_turno":    hora_turno.strftime("%H:%M"),
                 "tardanza_mins": mins,
             })
@@ -565,17 +622,25 @@ def calcular_tardanzas_acumulado(
     inicio_mes = fecha_hasta.replace(day=1)
     inicio_año = fecha_hasta.replace(month=1, day=1)
 
-    festivos_mes = get_festivos(inicio_mes, fecha_hasta)
+    # Un solo cálculo de festivos para todo el año; el mes es subconjunto.
     festivos_año = get_festivos(inicio_año, fecha_hasta)
 
-    dias_mes = get_dias_rango(inicio_mes, fecha_hasta, festivos_mes)
+    dias_mes = get_dias_rango(inicio_mes, fecha_hasta, festivos_año)
     dias_año = get_dias_rango(inicio_año, fecha_hasta, festivos_año)
+
+    # Precarga masiva de empleados y horarios para evitar N+1 en el loop.
+    empleados_cache = {e.nombre: e for e in db.query(Empleado).all()}
+    horarios_cache = _precargar_horarios(db)
 
     acum = {}
 
     def _procesar_dia(dia: date):
         try:
-            tardanzas = calcular_tardanzas_dia(db, dia)
+            tardanzas = calcular_tardanzas_dia(
+                db, dia,
+                empleados_cache=empleados_cache,
+                horarios_cache=horarios_cache,
+            )
         except HorarioNoConfiguradoError:
             # Día sin horario configurado: no suma ni aborta.
             return
