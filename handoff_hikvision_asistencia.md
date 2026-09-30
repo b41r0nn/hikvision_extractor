@@ -810,7 +810,7 @@ Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pér
 - **Path:** `/home/sistemas/hikvision_extractor`
 - **Contenedores:** `hikvision_db` (healthy), `hikvision_backend` (healthy), `hikvision_frontend` (running)
 - **URLs de acceso interno:** `http://localhost:8000/` (backend), `http://localhost:80/` (frontend)
-- **Tag:** `v1.5-ui-historico` apunta al commit `55cc668`.
+- **Tag:** `v1.5-ui-historico` apunta al commit `016d60a`.
 
 ### Pendientes post-deploy
 
