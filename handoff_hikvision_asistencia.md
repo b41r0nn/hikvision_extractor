@@ -756,6 +756,7 @@ Tres cambios aislados, un commit por punto, cada uno con test/grep de evidencia.
 | 3.5 | Nueva pestaña **"Histórico de Llegadas Tarde"** en Reportes. | Endpoint `GET /api/tardanzas/acumulado?fecha_hasta=YYYY-MM-DD&max_minutos=30`; tabla con `Empleado \| Área \| Minutos Mes \| Días Mes \| Minutos Año \| Días Año`; buscador y exportar a Excel. | `8eacc01` |
 | 3.6 | `calcular_tardanzas_dia` ya no rompe `/api/tardanzas` cuando un empleado no tiene turno o horario vigente para una fecha histórica. | Omite silenciosamente esos casos, igual que `calcular_tardanzas_acumulado`. | `b19df9a` |
 | 3.7 | Tarjetas **"Llegadas Tarde Hoy"** y **"Marcas del Día"** del dashboard con la misma altura (`h-[55vh]`) y scroll interno. | Grid usa `items-stretch`; ambas tarjetas usan `flex flex-col` y el tbody crece solo dentro del viewport. | `4564847` |
+| 3.8 | Histórico de llegadas tarde ahora trae datos de meses anteriores a la primera fecha de vigencia de `turno_horario`. | `obtener_horario_vigente` hace fallback al horario más antiguo cuando no hay uno vigente para la fecha consultada. | `9e8567c` |
 
 **Detalle técnico del endpoint `/api/tardanzas/acumulado`:**
 - Reutiliza `calcular_tardanzas_dia` para cada día laboral entre el inicio del mes/año y `fecha_hasta`.
@@ -798,7 +799,7 @@ Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pér
 - **Path:** `/home/sistemas/hikvision_extractor`
 - **Contenedores:** `hikvision_db` (healthy), `hikvision_backend` (healthy), `hikvision_frontend` (running)
 - **URLs de acceso interno:** `http://localhost:8000/` (backend), `http://localhost:80/` (frontend)
-- **Tag:** `v1.5-ui-historico` apunta al commit `4564847`.
+- **Tag:** `v1.5-ui-historico` apunta al commit `9e8567c`.
 
 ### Pendientes post-deploy
 
