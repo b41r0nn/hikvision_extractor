@@ -1,0 +1,66 @@
+# Secretos y configuración local
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+.dockerignore
+*Dockerfile*
+docker-compose*.yml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.venv/
+venv/
+
+# Node
+node_modules/
+package-lock.json
+yarn.lock
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs y datos temporales
+logs/
+tmp/
+temp/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+
+# Evidencia y tests locales
+test_evidencia/
+evidencia/
+tests/
+
+# Documentación que no va en imagen
+README.md
+handoff*.md
+CHANGELOG.md
+
+# Scripts de mantenimiento local
+restaurar.bat
+*.ps1
+*.sh
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
