@@ -763,7 +763,7 @@ def get_tardanzas_acumulado(
     fecha_hasta: Optional[date] = None,
     max_minutos: int = 30,
     db: Session = Depends(get_db),
-    user: models.Usuario = Depends(require_perm("ver_dashboard")),
+    user: models.Usuario = Depends(require_perm("ver_historico_tardanzas")),
 ):
     """
     Acumulado de minutos de tardanza por empleado para el mes y año de la fecha

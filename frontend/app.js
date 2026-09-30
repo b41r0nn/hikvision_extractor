@@ -200,6 +200,10 @@ async function initApp() {
     const adminAny = ['admin_empleados','admin_correo','admin_roles','sync_empleados','forzar_extraccion'].some(p => tienePermiso(p));
     if (adminNav) adminNav.style.display = adminAny ? '' : 'none';
 
+    // Ocultar pestaña de histórico en reportes si no tiene permiso
+    const btnHist = document.getElementById('tab-btn-historico');
+    if (btnHist) btnHist.style.display = tienePermiso('ver_historico_tardanzas') ? '' : 'none';
+
     showView('dashboard');
 }
 
@@ -221,7 +225,12 @@ function showView(name) {
     if (nav) nav.classList.add('active');
 
     if (name === 'marcas')   cargarMarcasDelDia();
-    if (name === 'reportes') { showReportTab('generar'); cargarEmpleadosParaReporte(); }
+    if (name === 'reportes') {
+        // Si puede ver histórico, mostrarlo por defecto; si no, quedarse en generar
+        const tabInicial = tienePermiso('ver_historico_tardanzas') ? 'historico' : 'generar';
+        showReportTab(tabInicial);
+        cargarEmpleadosParaReporte();
+    }
     if (name === 'admin')    cargarAdmin();
 }
 

@@ -25,13 +25,14 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 # Lista canónica de permisos del sistema.
 # Pueden crearse más vía admin, pero estos son los que el código valida.
 PERMISOS = {
-    "ver_dashboard":      "Ver dashboard, KPIs, tardanzas y marcas del día",
-    "generar_reportes":   "Generar y descargar reportes Excel",
-    "forzar_extraccion":  "Ejecutar extracción manual de marcaciones",
-    "sync_empleados":     "Sincronizar empleados desde el biométrico",
-    "admin_empleados":    "Editar empleados (departamento, hora, tolerancia, activo)",
-    "admin_correo":       "Configurar correo y probar envío",
-    "admin_roles":        "Administrar usuarios, roles y permisos",
+    "ver_dashboard":           "Ver dashboard, KPIs, tardanzas y marcas del día",
+    "generar_reportes":        "Generar y descargar reportes Excel",
+    "ver_historico_tardanzas": "Ver histórico de llegadas tarde (acumulado mensual/anual)",
+    "forzar_extraccion":       "Ejecutar extracción manual de marcaciones",
+    "sync_empleados":          "Sincronizar empleados desde el biométrico",
+    "admin_empleados":         "Editar empleados (departamento, hora, tolerancia, activo)",
+    "admin_correo":            "Configurar correo y probar envío",
+    "admin_roles":             "Administrar usuarios, roles y permisos",
 }
 
 
@@ -125,6 +126,7 @@ def init_rbac(db: Session) -> None:
     reportes_rol.permisos = [
         permiso_objs["ver_dashboard"],
         permiso_objs["generar_reportes"],
+        permiso_objs["ver_historico_tardanzas"],
     ]
 
     db.commit()
