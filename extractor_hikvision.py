@@ -164,49 +164,58 @@ def normalize(e):
 
 # ── Base de Datos ─────────────────────────────────────────────────────────────
 def save_to_db(db, new_events, include_all=False):
+    from sqlalchemy.exc import IntegrityError
     added = 0
-    try:
-        for e in new_events:
-            nombre = e.get("Card Holder", "").strip()
-            # Omitimos eventos sin nombre de empleado si no son deseados
-            if not include_all and not nombre:
-                continue
-                
-            fecha = e.get("Event Date")
-            hora = e.get("Event Time")
-            
-            # Dedup por empleado_id + fecha + hora (consistente con el resto del sistema).
-            # Si no hay empleado_id, se cae al fallback por nombre para no perder el registro.
-            emp_id = e.get("Employee ID", "").strip()
-            if emp_id:
-                existe = db.query(RegistroAsistencia).filter(
-                    RegistroAsistencia.empleado_id == emp_id,
-                    RegistroAsistencia.fecha == fecha,
-                    RegistroAsistencia.hora == hora
-                ).first()
-            else:
-                existe = db.query(RegistroAsistencia).filter(
-                    RegistroAsistencia.nombre_empleado == nombre,
-                    RegistroAsistencia.fecha == fecha,
-                    RegistroAsistencia.hora == hora
-                ).first()
-            
-            if not existe:
-                registro = RegistroAsistencia(
-                    empleado_id=emp_id or None,
-                    nombre_empleado=nombre,
-                    fecha=fecha,
-                    hora=hora,
-                    tipo_evento=e.get("Event Type"),
-                    evento_raw=e.get("Raw Time")
-                )
-                db.add(registro)
+    for e in new_events:
+        nombre = e.get("Card Holder", "").strip()
+        # Omitimos eventos sin nombre de empleado si no son deseados
+        if not include_all and not nombre:
+            continue
+
+        fecha = e.get("Event Date")
+        hora = e.get("Event Time")
+
+        # Dedup por empleado_id + fecha + hora (consistente con el resto del sistema).
+        # Si no hay empleado_id, se cae al fallback por nombre para no perder el registro.
+        emp_id = e.get("Employee ID", "").strip()
+        if emp_id:
+            existe = db.query(RegistroAsistencia).filter(
+                RegistroAsistencia.empleado_id == emp_id,
+                RegistroAsistencia.fecha == fecha,
+                RegistroAsistencia.hora == hora
+            ).first()
+        else:
+            existe = db.query(RegistroAsistencia).filter(
+                RegistroAsistencia.nombre_empleado == nombre,
+                RegistroAsistencia.fecha == fecha,
+                RegistroAsistencia.hora == hora
+            ).first()
+
+        if not existe:
+            # SAVEPOINT por registro: si el constraint
+            # uq_registro_empleado_fecha_hora (NULLS NOT DISTINCT) rechaza
+            # esta marca, se revierte SOLO este registro y se conservan las
+            # marcas validas ya insertadas en este lote. Usar db.rollback()
+            # aqui revertiria la transaccion completa y perderia esos registros.
+            try:
+                with db.begin_nested():
+                    registro = RegistroAsistencia(
+                        empleado_id=emp_id or None,
+                        nombre_empleado=nombre,
+                        fecha=fecha,
+                        hora=hora,
+                        tipo_evento=e.get("Event Type"),
+                        evento_raw=e.get("Raw Time")
+                    )
+                    db.add(registro)
+                    db.flush()
                 added += 1
-                
-        db.flush() # Guardamos en sesion pero commit final lo hace main()
-    except Exception as ex:
-        print(f"Error al guardar en BD: {ex}")
-        raise ex
+            except IntegrityError:
+                print(
+                    f"[DEDUP-BD] Registro duplicado ignorado "
+                    f"(constraint): emp_id={emp_id!r} nombre={nombre!r} "
+                    f"fecha={fecha} hora={hora}"
+                )
     return added
 
 def parse_events(raw_data, day):
