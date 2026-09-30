@@ -754,6 +754,7 @@ Tres cambios aislados, un commit por punto, cada uno con test/grep de evidencia.
 | 3.3 | Tarjeta **"Marcas del Día"** del dashboard con altura limitada (`max-height: calc(100vh - 320px)`) y scroll interno (`overflow-y-auto`) para no alargar la página. | Tarjeta usa `flex flex-col` y el tbody crece solo dentro del viewport. | `d67d51c` |
 | 3.4 | Dashboard filtra llegadas tarde > 30 minutos en tarjeta y KPIs; botón para exportar la tarjeta a CSV/Excel. | Lógica en `frontend/app.js` con constante `TARDANZA_MAX_MINUTOS_DASHBOARD = 30`; función `exportarTardanzasExcel()`. | `8eacc01` |
 | 3.5 | Nueva pestaña **"Histórico de Llegadas Tarde"** en Reportes. | Endpoint `GET /api/tardanzas/acumulado?fecha_hasta=YYYY-MM-DD&max_minutos=30`; tabla con `Empleado \| Área \| Minutos Mes \| Días Mes \| Minutos Año \| Días Año`; buscador y exportar a Excel. | `8eacc01` |
+| 3.6 | `calcular_tardanzas_dia` ya no rompe `/api/tardanzas` cuando un empleado no tiene turno o horario vigente para una fecha histórica. | Omite silenciosamente esos casos, igual que `calcular_tardanzas_acumulado`. | `b19df9a` |
 
 **Detalle técnico del endpoint `/api/tardanzas/acumulado`:**
 - Reutiliza `calcular_tardanzas_dia` para cada día laboral entre el inicio del mes/año y `fecha_hasta`.
@@ -796,13 +797,12 @@ Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pér
 - **Path:** `/home/sistemas/hikvision_extractor`
 - **Contenedores:** `hikvision_db` (healthy), `hikvision_backend` (healthy), `hikvision_frontend` (running)
 - **URLs de acceso interno:** `http://localhost:8000/` (backend), `http://localhost:80/` (frontend)
-- **Tag:** `v1.5-ui-historico` apunta al commit `d67d51c`.
+- **Tag:** `v1.5-ui-historico` apunta al commit `b19df9a`.
 
 ### Pendientes post-deploy
 
 1. Validación visual del frontend en navegador (logo PNG, scroll de marcas, buscador, sincronización de fechas, datos de KPIs).
-2. Revisar por qué los KPIs mostraban `—` en la fecha 28/09/2026; verificar que `/api/kpis` responde correctamente para días sin datos (debe devolver 0, no null).
-3. Configurar cuenta SMTP real en el panel de admin y probar envío de correo de prueba.
-4. Monitorear el primer disparo real del scheduler (`extraccion_periodica`, `reporte_semanal`, `reporte_mensual`).
+2. Configurar cuenta SMTP real en el panel de admin y probar envío de correo de prueba.
+3. Monitorear el primer disparo real del scheduler (`extraccion_periodica`, `reporte_semanal`, `reporte_mensual`).
 
 Cuando se retome, sea para configurar el correo real o para nuevos fixes, se sigue el mismo circuito de siempre.
