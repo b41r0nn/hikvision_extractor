@@ -26,7 +26,9 @@ from .report_service import (
     get_festivos, es_dia_laboral, init_festivos, obtener_horario_vigente,
     HorarioNoConfiguradoError,
 )
-from .email_service import enviar_correo_prueba_a, CorreoNoConfiguradoError
+from .email_service import (
+    enviar_correo_prueba_a, enviar_correo_prueba, CorreoNoConfiguradoError,
+)
 from .sync_empleados import sync_empleados
 from .auth import (
     get_current_user, require_perm, get_password_hash, verify_password,
@@ -665,8 +667,9 @@ def get_status(
                 ultima = ultima.replace(tzinfo=timezone.utc)
             delta = datetime.now(timezone.utc) - ultima
             horas_desde_ultima = round(delta.total_seconds() / 3600, 1)
-            # 24h de ciclo + 2h de margen
-            if horas_desde_ultima > 26:
+            # Extracción programada cada hora en horario laboral (6-20).
+            # Alertamos si pasaron más de 3h sin extracción exitosa.
+            if horas_desde_ultima > 3:
                 alerta_retraso = True
         except Exception:
             pass
@@ -1318,7 +1321,7 @@ def test_correo_legacy(
     """Envía un correo de prueba para verificar la configuración SMTP (legacy)."""
     import smtplib
     try:
-        enviar_correo_prueba_a(None)
+        enviar_correo_prueba()
         return {"message": "Correo de prueba enviado. Revisa la bandeja de entrada de los destinatarios."}
     except CorreoNoConfiguradoError as e:
         raise HTTPException(status_code=400, detail=str(e))

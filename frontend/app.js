@@ -383,7 +383,7 @@ async function mostrarAvisoExtraccion() {
                         <div class="font-semibold text-red-300">Extracción automática atrasada</div>
                         <div class="text-xs text-red-200/80 mt-0.5">
                             La última extracción exitosa fue hace <strong>${escapeHtml(horas)}h</strong>
-                            (${escapeHtml(ultima)}). El ciclo es cada 24h. Revisa el scheduler o reinicia el backend.
+                            (${escapeHtml(ultima)}). El ciclo es cada hora en horario laboral. Revisa el scheduler o reinicia el backend.
                         </div>
                     </div>
                 </div>`;
