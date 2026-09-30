@@ -514,7 +514,7 @@ def calcular_tardanzas_dia(db: Session, dia: date) -> List[dict]:
         except HorarioNoConfiguradoError:
             continue
 
-        mins = calcular_tardanza(primera_marca, hora_turno, tolerancia)
+        mins = calcular_tardanza(primera_hora, hora_turno, tolerancia)
         if mins is not None:
             tardanzas.append({
                 "nombre":        nombre,
