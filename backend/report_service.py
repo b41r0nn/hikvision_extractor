@@ -501,17 +501,20 @@ def calcular_tardanzas_dia(db: Session, dia: date) -> List[dict]:
         if not emp:
             continue
 
+        # Omitir silenciosamente si no tiene turno o no tiene horario vigente.
+        # Antes se lanzaba HorarioNoConfiguradoError, pero eso rompía el dashboard
+        # para fechas históricas donde aún no se habían versionado los horarios.
         if emp.turno_id is None:
-            raise HorarioNoConfiguradoError(
-                f"Empleado '{emp.nombre}' (id={emp.id}) no tiene turno_id asignado. "
-                f"Correr migración de datos de Fase B antes de calcular tardanzas."
+            continue
+
+        try:
+            hora_turno, tolerancia = obtener_horario_vigente(
+                db, emp.turno_id, dia.weekday(), dia
             )
+        except HorarioNoConfiguradoError:
+            continue
 
-        hora_turno, tolerancia = obtener_horario_vigente(
-            db, emp.turno_id, dia.weekday(), dia
-        )
-
-        mins = calcular_tardanza(primera_hora, hora_turno, tolerancia)
+        mins = calcular_tardanza(primera_marca, hora_turno, tolerancia)
         if mins is not None:
             tardanzas.append({
                 "nombre":        nombre,
