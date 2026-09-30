@@ -290,10 +290,16 @@ def generar_reporte(
     ventana_fusion = int(os.getenv("MARCA_FUSION_MINUTOS", "2"))
     registros = _fusionar_marcas_por_empleado_dia(registros, ventana_fusion)
 
-    # 5. Pivot: {nombre: {fecha: [time, ...]}} — SOBRE datos ya fusionados
+    # Mapa employee_id → nombre canónico (el de la tabla Empleado, no el del biométrico).
+    id_a_nombre = {e.employee_id: e.nombre for e in empleados_reporte if e.employee_id}
+
+    # 5. Pivot: {nombre: {fecha: [time, ...]}} — SOBRE datos ya fusionados.
+    # Usamos el nombre canónico del Empleado (vía employee_id) para que el pivot
+    # coincida con empleados_sorted y resista cambios de nombre en el biométrico.
     pivot: dict = defaultdict(lambda: defaultdict(list))
     for r in registros:
-        pivot[r.nombre_empleado][r.fecha].append(r.hora)
+        nombre_canonico = id_a_nombre.get(r.empleado_id, r.nombre_empleado)
+        pivot[nombre_canonico][r.fecha].append(r.hora)
 
     empleados_sorted = sorted(e.nombre for e in empleados_reporte)
 
