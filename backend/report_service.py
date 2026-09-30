@@ -545,7 +545,7 @@ def calcular_tardanzas_dia(
         empleados_cache: dict opcional {nombre: Empleado} para evitar N+1.
         horarios_cache: dict opcional {(turno_id, dia_semana): [...]} para
                         evitar una query por empleado/día.
-    """"
+    """
     festivos = get_festivos(dia, dia)
     if not es_dia_laboral(dia, festivos):
         return []
