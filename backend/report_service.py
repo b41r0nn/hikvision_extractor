@@ -270,13 +270,14 @@ def generar_reporte(
     if not empleados_reporte:
         raise ValueError("No hay empleados activos para los filtros seleccionados.")
 
-    nombres_reporte = {e.nombre for e in empleados_reporte}
+    ids_reporte = {e.employee_id for e in empleados_reporte if e.employee_id}
 
-    # 3. Consultar registros del período
+    # 3. Consultar registros del período (por employee_id, no por nombre,
+    #    para mantener histórico si el nombre cambia y separar homónimos).
     query = db.query(RegistroAsistencia).filter(
         RegistroAsistencia.fecha >= fecha_inicio,
         RegistroAsistencia.fecha <= fecha_fin,
-        RegistroAsistencia.nombre_empleado.in_(nombres_reporte)
+        RegistroAsistencia.empleado_id.in_(ids_reporte)
     )
 
     registros = query.order_by(
@@ -549,25 +550,26 @@ def calcular_tardanzas_dia(
     if not es_dia_laboral(dia, festivos):
         return []
 
-    # Primer marca del día por empleado
+    # Primer marca del día por empleado (usar empleado_id, no nombre, para
+    # evitar fusionar homónimos y mantener histórico si el nombre cambia).
     registros = db.query(RegistroAsistencia).filter(
         RegistroAsistencia.fecha == dia
-    ).order_by(RegistroAsistencia.nombre_empleado, RegistroAsistencia.hora).all()
+    ).order_by(RegistroAsistencia.empleado_id, RegistroAsistencia.hora).all()
 
     primeras: dict = {}
     for r in registros:
-        if r.nombre_empleado not in primeras:
-            primeras[r.nombre_empleado] = r.hora
+        if r.empleado_id and r.empleado_id not in primeras:
+            primeras[r.empleado_id] = (r.hora, r.nombre_empleado)
 
-    # Buscar turno de cada empleado (usar cache si se proporciona)
+    # Buscar turno de cada empleado (usar cache indexado por employee_id)
     if empleados_cache is None:
-        empleados = {e.nombre: e for e in db.query(Empleado).all()}
+        empleados = {e.employee_id: e for e in db.query(Empleado).all()}
     else:
         empleados = empleados_cache
     tardanzas = []
 
-    for nombre, primera_hora in primeras.items():
-        emp = empleados.get(nombre)
+    for emp_id, (primera_hora, nombre_raw) in primeras.items():
+        emp = empleados.get(emp_id)
         # Ignorar si no está registrado como Empleado
         if not emp:
             continue
@@ -591,7 +593,7 @@ def calcular_tardanzas_dia(
         mins = calcular_tardanza(primera_hora, hora_turno, tolerancia)
         if mins is not None:
             tardanzas.append({
-                "nombre":        nombre,
+                "nombre":        emp.nombre,
                 "departamento":  emp.departamento,
                 "primera_marca": primera_hora.strftime("%H:%M"),
                 "hora_turno":    hora_turno.strftime("%H:%M"),
@@ -629,7 +631,7 @@ def calcular_tardanzas_acumulado(
     dias_año = get_dias_rango(inicio_año, fecha_hasta, festivos_año)
 
     # Precarga masiva de empleados y horarios para evitar N+1 en el loop.
-    empleados_cache = {e.nombre: e for e in db.query(Empleado).all()}
+    empleados_cache = {e.employee_id: e for e in db.query(Empleado).all()}
     horarios_cache = _precargar_horarios(db)
 
     acum = {}
