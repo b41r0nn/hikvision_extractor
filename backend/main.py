@@ -36,6 +36,9 @@ from . import config_service
 from . import config_correo_service
 from .scheduler import reschedule_report_jobs, scheduler as app_scheduler
 from .timezone import hoy_bogota, ahora_bogota
+from .extraction_lock import (
+    acquire_extraction_lock, release_extraction_lock, is_extracting,
+)
 import extractor_hikvision
 
 
@@ -98,6 +101,9 @@ async def lifespan(app: FastAPI):
                     print(f"[BACKFILL] Rellenando desde {start_backfill} hasta {end_backfill}...")
 
                     def _backfill():
+                        if not acquire_extraction_lock(blocking=False):
+                            print("[BACKFILL] Omitido: ya hay una extracción en curso.")
+                            return
                         try:
                             print(f"[EXTRACCION] Disparador: backfill "
                                   f"(rango {start_backfill} -> {end_backfill})")
@@ -118,6 +124,8 @@ async def lifespan(app: FastAPI):
                                   f"se reintentara en el proximo arranque.")
                         except Exception as e:
                             print(f"[BACKFILL ERROR] {e}")
+                        finally:
+                            release_extraction_lock()
 
                     # Techo duro: si el backfill supera BACKFILL_TIMEOUT_SEC,
                     # el watchdog mata el proceso. La política restart: always
@@ -186,9 +194,13 @@ def progress_callback(msg: str):
     extraction_state["progress"] = msg
 
 def ejecutar_extraccion(start_date: str, end_date: str):
-    if extraction_state["is_running"]:
+    if is_extracting():
+        extraction_state["progress"] = "Omitida: ya hay una extracción en curso."
         return
     try:
+        if not acquire_extraction_lock(blocking=False):
+            extraction_state["progress"] = "Omitida: ya hay una extracción en curso."
+            return
         extraction_state["is_running"] = True
         extraction_state["progress"]   = f"Iniciando ({start_date} → {end_date})..."
         print(f"[EXTRACCION] Disparador: manual "
@@ -212,6 +224,7 @@ def ejecutar_extraccion(start_date: str, end_date: str):
         extraction_state["progress"] = f"Error: {e}"
         print(f"[EXTRACCION ERROR] {e}")
     finally:
+        release_extraction_lock()
         extraction_state["is_running"] = False
 
 

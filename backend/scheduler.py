@@ -4,6 +4,7 @@ from .database import SessionLocal
 from .sync_empleados import sync_empleados
 from .email_service import enviar_reporte_semanal, enviar_reporte_mensual
 from .config_service import get_periodicidad, set_ultima_extraccion
+from .extraction_lock import acquire_extraction_lock, release_extraction_lock
 
 scheduler = BackgroundScheduler()
 
@@ -11,6 +12,9 @@ scheduler = BackgroundScheduler()
 def tarea_extraccion_periodica():
     """Extrae eventos del día actual cada hora en horario laboral (6-20)."""
     print("[SCHEDULER] Ejecutando extracción periódica programada...")
+    if not acquire_extraction_lock(blocking=False):
+        print("[SCHEDULER] Extracción omitida: ya hay una extracción en curso.")
+        return
     try:
         print("[EXTRACCION] Disparador: scheduler (cron hour=6-20, minute=0)")
         extractor_hikvision.main()
@@ -23,6 +27,8 @@ def tarea_extraccion_periodica():
         print("[SCHEDULER] Extracción periódica completada y registrada.")
     except Exception as e:
         print(f"[SCHEDULER ERROR] Extracción diaria: {e}")
+    finally:
+        release_extraction_lock()
 
 
 def tarea_sync_empleados_diaria():
