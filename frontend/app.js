@@ -733,7 +733,7 @@ let adminTurnos = [];
 
 function opcionesTurno(selectedId) {
     return adminTurnos.map(t =>
-        `<option value="${escapeHtml(t.id)}" ${t.id === selectedId ? 'selected' : ''}>${escapeHtml(t.nombre)}</option>`
+        `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${escapeHtml(t.nombre)}</option>`
     ).join('');
 }
 
@@ -1252,7 +1252,7 @@ async function cargarUsuariosRoles() {
 
         // Select de roles para nuevo usuario
         const sel = document.getElementById('new-user-rol');
-        sel.innerHTML = roles.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.nombre)}</option>`).join('');
+        sel.innerHTML = roles.map(r => `<option value="${r.id}">${escapeHtml(r.nombre)}</option>`).join('');
 
         // Tabla usuarios
         const tbodyU = document.getElementById('tabla-usuarios');
