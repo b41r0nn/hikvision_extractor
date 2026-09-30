@@ -39,6 +39,16 @@ function tienePermiso(nombre) {
     return userPermisos.includes(nombre);
 }
 
+function escapeHtml(text) {
+    if (text == null) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
 function descargarCSV(rows, filename) {
     const csv = rows.map(r =>
         r.map(cell => {
@@ -291,8 +301,8 @@ function renderHistoricoTardanzas(lista) {
     }
     tbody.innerHTML = lista.map(h => `
         <tr>
-            <td class="font-medium text-white">${h.nombre}</td>
-            <td><span class="badge-dept">${h.departamento || '—'}</span></td>
+            <td class="font-medium text-white">${escapeHtml(h.nombre)}</td>
+            <td><span class="badge-dept">${escapeHtml(h.departamento) || '—'}</span></td>
             <td class="text-orange-400 font-mono font-semibold">${h.minutos_mes} min</td>
             <td class="text-slate-400">${h.dias_mes}</td>
             <td class="text-orange-400 font-mono font-semibold">${h.minutos_año} min</td>
@@ -372,8 +382,8 @@ async function mostrarAvisoExtraccion() {
                     <div class="flex-1">
                         <div class="font-semibold text-red-300">Extracción automática atrasada</div>
                         <div class="text-xs text-red-200/80 mt-0.5">
-                            La última extracción exitosa fue hace <strong>${horas}h</strong>
-                            (${ultima}). El ciclo es cada 24h. Revisa el scheduler o reinicia el backend.
+                            La última extracción exitosa fue hace <strong>${escapeHtml(horas)}h</strong>
+                            (${escapeHtml(ultima)}). El ciclo es cada 24h. Revisa el scheduler o reinicia el backend.
                         </div>
                     </div>
                 </div>`;
@@ -387,7 +397,7 @@ async function mostrarAvisoExtraccion() {
                 const f = a.fecha || '—';
                 const ob = a.obtenido ?? 0;
                 const es = a.esperado ?? 0;
-                return `<div>Extracción del <strong>${f}</strong> puede estar incompleta (<strong>${ob}</strong> de <strong>${es}</strong> eventos)</div>`;
+                return `<div>Extracción del <strong>${escapeHtml(f)}</strong> puede estar incompleta (<strong>${escapeHtml(ob)}</strong> de <strong>${escapeHtml(es)}</strong> eventos)</div>`;
             }).join('');
             bannerInc.innerHTML = `
                 <div class="flex items-start gap-3">
@@ -474,10 +484,10 @@ function renderTardanzas(lista) {
     }
     tbody.innerHTML = lista.map(t => `
         <tr>
-            <td class="font-medium text-white">${t.nombre}</td>
-            <td><span class="badge-dept">${t.departamento || '—'}</span></td>
-            <td class="text-orange-400 font-mono font-semibold">${t.primera_marca}</td>
-            <td class="text-slate-400 font-mono">${t.hora_turno}</td>
+            <td class="font-medium text-white">${escapeHtml(t.nombre)}</td>
+            <td><span class="badge-dept">${escapeHtml(t.departamento) || '—'}</span></td>
+            <td class="text-orange-400 font-mono font-semibold">${escapeHtml(t.primera_marca)}</td>
+            <td class="text-slate-400 font-mono">${escapeHtml(t.hora_turno)}</td>
             <td><span class="badge-late">+${t.tardanza_mins} min</span></td>
         </tr>`).join('');
 }
@@ -520,9 +530,9 @@ function renderMarcas(lista) {
     }
     tbody.innerHTML = lista.map(r => `
         <tr>
-            <td class="text-sky-300 font-medium">${r.nombre_empleado || '—'}</td>
-            <td class="font-mono text-slate-300">${r.hora ? String(r.hora).slice(0,5) : '—'}</td>
-            <td class="text-xs text-slate-500">${r.tipo_evento || '—'}</td>
+            <td class="text-sky-300 font-medium">${escapeHtml(r.nombre_empleado) || '—'}</td>
+            <td class="font-mono text-slate-300">${r.hora ? escapeHtml(String(r.hora)).slice(0,5) : '—'}</td>
+            <td class="text-xs text-slate-500">${escapeHtml(r.tipo_evento) || '—'}</td>
         </tr>`).join('');
 }
 
@@ -549,11 +559,11 @@ async function cargarMarcasDelDia() {
         }
         tbody.innerHTML = data.map(r => `
             <tr>
-                <td class="text-sky-300 font-medium">${r.nombre_empleado || '—'}</td>
-                <td class="font-mono text-slate-400 text-xs">${r.fecha || '—'}</td>
-                <td class="font-mono text-slate-300">${r.hora ? String(r.hora).slice(0,5) : '—'}</td>
-                <td class="text-xs text-slate-500">${r.tipo_evento || '—'}</td>
-                <td class="font-mono text-xs text-slate-500">${r.empleado_id || '—'}</td>
+                <td class="text-sky-300 font-medium">${escapeHtml(r.nombre_empleado) || '—'}</td>
+                <td class="font-mono text-slate-400 text-xs">${escapeHtml(r.fecha) || '—'}</td>
+                <td class="font-mono text-slate-300">${r.hora ? escapeHtml(String(r.hora)).slice(0,5) : '—'}</td>
+                <td class="text-xs text-slate-500">${escapeHtml(r.tipo_evento) || '—'}</td>
+                <td class="font-mono text-xs text-slate-500">${escapeHtml(r.empleado_id) || '—'}</td>
             </tr>`).join('');
     } catch(e) {
         document.getElementById('tabla-marcas-dia').innerHTML =
@@ -622,8 +632,8 @@ function renderDeptFilter() {
     }
     cont.innerHTML = todosDeptos.map(d => `
         <label class="flex items-center gap-1.5 cursor-pointer px-3 py-1 rounded-full border border-slate-600 hover:border-sky-500 text-xs text-slate-300 hover:text-sky-300 transition-all">
-            <input type="checkbox" class="dept-chk emp-checkbox" value="${d}"
-                   onchange="filtrarPorDept()"> ${d}
+            <input type="checkbox" class="dept-chk emp-checkbox" value="${escapeHtml(d)}"
+                   onchange="filtrarPorDept()"> ${escapeHtml(d)}
         </label>`).join('');
 }
 
@@ -644,9 +654,9 @@ function renderEmpList(lista) {
     }
     cont.innerHTML = lista.map(e => `
         <label class="flex items-center gap-3 px-4 py-2.5 hover:bg-slate-800/40 cursor-pointer">
-            <input type="checkbox" class="emp-checkbox emp-chk" value="${e.employee_id}" checked>
-            <span class="text-sm text-slate-300 flex-1">${e.nombre}</span>
-            ${e.departamento ? `<span class="badge-dept text-xs">${e.departamento}</span>` : ''}
+            <input type="checkbox" class="emp-checkbox emp-chk" value="${escapeHtml(e.employee_id)}" checked>
+            <span class="text-sm text-slate-300 flex-1">${escapeHtml(e.nombre)}</span>
+            ${e.departamento ? `<span class="badge-dept text-xs">${escapeHtml(e.departamento)}</span>` : ''}
         </label>`).join('');
 }
 
@@ -723,7 +733,7 @@ let adminTurnos = [];
 
 function opcionesTurno(selectedId) {
     return adminTurnos.map(t =>
-        `<option value="${t.id}" ${t.id === selectedId ? 'selected' : ''}>${t.nombre}</option>`
+        `<option value="${escapeHtml(t.id)}" ${t.id === selectedId ? 'selected' : ''}>${escapeHtml(t.nombre)}</option>`
     ).join('');
 }
 
@@ -744,15 +754,15 @@ async function cargarEmpleadosAdmin() {
         tbody.innerHTML = emps.map(e => {
             return `
             <tr id="emp-row-${e.id}" class="${e.activo ? '' : 'opacity-50'}">
-                <td class="font-mono text-xs text-slate-400">${e.employee_id}</td>
-                <td class="font-medium text-white">${e.nombre}${e.activo ? '' : ' <span class="text-[10px] text-slate-500 ml-1">(Inactivo)</span>'}</td>
+                <td class="font-mono text-xs text-slate-400">${escapeHtml(e.employee_id)}</td>
+                <td class="font-medium text-white">${escapeHtml(e.nombre)}${e.activo ? '' : ' <span class="text-[10px] text-slate-500 ml-1">(Inactivo)</span>'}</td>
                 <td class="text-center">
                     <input type="checkbox" id="emp-activo-${e.id}" ${e.activo ? 'checked' : ''}
                            onchange="toggleEmpleadoActivo(${e.id}, this.checked)"
                            class="emp-checkbox" title="Activo / Inactivo">
                 </td>
                 <td>
-                    <input type="text" id="emp-dept-${e.id}" value="${e.departamento || ''}"
+                    <input type="text" id="emp-dept-${e.id}" value="${escapeHtml(e.departamento) || ''}"
                            class="form-input text-xs py-1" placeholder="Área">
                 </td>
                 <td>
@@ -868,7 +878,7 @@ function renderizarTurnos() {
         }).join('');
         return `
         <tr>
-            <td class="font-medium text-white">${t.nombre}</td>
+            <td class="font-medium text-white">${escapeHtml(t.nombre)}</td>
             ${celdas}
             <td>
                 <button onclick="editarTurno(${t.id})" class="btn-success text-xs py-1 px-2 mb-1">Editar</button>
@@ -936,7 +946,7 @@ async function editarTurno(id) {
         const t = await res.json();
         document.getElementById('form-turno').classList.remove('hidden');
         document.getElementById('form-vigencia').classList.add('hidden');
-        document.getElementById('titulo-form-turno').textContent = `Editar turno: ${t.nombre}`;
+        document.getElementById('titulo-form-turno').textContent = `Editar turno: ${escapeHtml(t.nombre)}`;
         document.getElementById('turno-id').value = t.id;
         document.getElementById('turno-nombre').value = t.nombre;
         document.getElementById('turno-salida').value = t.hora_salida || '';
@@ -1015,8 +1025,8 @@ async function cargarMarcasSinAsociar() {
         }
         tbody.innerHTML = data.map(r => `
             <tr>
-                <td class="text-slate-300">${r.nombre || '—'}</td>
-                <td class="font-mono text-xs text-slate-400">${r.employee_id || '—'}</td>
+                <td class="text-slate-300">${escapeHtml(r.nombre) || '—'}</td>
+                <td class="font-mono text-xs text-slate-400">${escapeHtml(r.employee_id) || '—'}</td>
             </tr>`).join('');
     } catch(e) {
         tbody.innerHTML = '<tr><td colspan="2" class="text-center py-4 text-red-400 text-xs">Error cargando datos</td></tr>';
@@ -1037,8 +1047,8 @@ async function cargarFestivos() {
         }
         tbody.innerHTML = data.map(f => `
             <tr>
-                <td class="font-mono text-slate-300">${f.fecha}</td>
-                <td class="text-white">${f.descripcion}</td>
+                <td class="font-mono text-slate-300">${escapeHtml(f.fecha)}</td>
+                <td class="text-white">${escapeHtml(f.descripcion)}</td>
             </tr>`).join('');
     } catch(e) {
         tbody.innerHTML = '<tr><td colspan="2" class="text-center py-6 text-red-400 text-xs">Error cargando festivos</td></tr>';
@@ -1242,7 +1252,7 @@ async function cargarUsuariosRoles() {
 
         // Select de roles para nuevo usuario
         const sel = document.getElementById('new-user-rol');
-        sel.innerHTML = roles.map(r => `<option value="${r.id}">${r.nombre}</option>`).join('');
+        sel.innerHTML = roles.map(r => `<option value="${escapeHtml(r.id)}">${escapeHtml(r.nombre)}</option>`).join('');
 
         // Tabla usuarios
         const tbodyU = document.getElementById('tabla-usuarios');
@@ -1250,14 +1260,14 @@ async function cargarUsuariosRoles() {
             const r = roles.find(x => x.id === u.rol_id);
             return `
             <tr>
-                <td class="font-medium text-white">${u.username}</td>
-                <td><span class="badge-dept text-xs">${r ? r.nombre : '—'}</span></td>
+                <td class="font-medium text-white">${escapeHtml(u.username)}</td>
+                <td><span class="badge-dept text-xs">${r ? escapeHtml(r.nombre) : '—'}</span></td>
                 <td class="text-center">
                     <input type="checkbox" ${u.activo ? 'checked' : ''} class="emp-checkbox"
                            onchange="toggleUsuario(${u.id}, this.checked)">
                 </td>
                 <td class="flex gap-1">
-                    ${u.id !== currentUser?.id ? `<button onclick="resetearPasswordUsuario(${u.id}, '${u.username}')" class="btn-warning text-xs py-1">Resetear pass</button>` : ''}
+                    ${u.id !== currentUser?.id ? `<button onclick="resetearPasswordUsuario(${u.id}, '${escapeHtml(u.username)}')" class="btn-warning text-xs py-1">Resetear pass</button>` : ''}
                     <button onclick="eliminarUsuario(${u.id})" class="btn-danger text-xs py-1">Eliminar</button>
                 </td>
             </tr>`;
@@ -1269,7 +1279,7 @@ async function cargarUsuariosRoles() {
             const permisosAsignados = r.permisos.map(p => p.nombre);
             return `
             <tr>
-                <td class="font-medium text-white">${r.nombre}</td>
+                <td class="font-medium text-white">${escapeHtml(r.nombre)}</td>
                 <td class="text-xs text-slate-300">
                     <div class="flex flex-wrap gap-1">
                         ${perms.map(p => `
@@ -1277,7 +1287,7 @@ async function cargarUsuariosRoles() {
                                 <input type="checkbox" ${permisosAsignados.includes(p.nombre) ? 'checked' : ''}
                                        onchange="togglePermisoRol(${r.id}, ${p.id}, this.checked)"
                                        class="emp-checkbox">
-                                <span class="text-slate-400">${p.nombre}</span>
+                                <span class="text-slate-400">${escapeHtml(p.nombre)}</span>
                             </label>
                         `).join('')}
                     </div>
