@@ -210,7 +210,10 @@ function stopInactivityTimer() {
 
 function startInactivityTimer() {
     const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click'];
-    events.forEach(ev => document.addEventListener(ev, resetInactivityTimer, { passive: true }));
+    events.forEach(ev => {
+        document.removeEventListener(ev, resetInactivityTimer);
+        document.addEventListener(ev, resetInactivityTimer, { passive: true });
+    });
     resetInactivityTimer();
 }
 
