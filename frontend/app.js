@@ -186,8 +186,32 @@ function logout(msg) {
     localStorage.removeItem('username');
     currentUser = null;
     userPermisos = [];
+    stopInactivityTimer();
     if (msg) showToast(msg, 'error');
     showLogin();
+}
+
+// ── Cierre por inactividad ─────────────────────────────────────────────────
+const INACTIVITY_MINUTES = 30;
+let _inactivityTimer = null;
+
+function resetInactivityTimer() {
+    if (!localStorage.getItem('token')) return;
+    clearTimeout(_inactivityTimer);
+    _inactivityTimer = setTimeout(() => {
+        logout('Sesión cerrada por inactividad.');
+    }, INACTIVITY_MINUTES * 60 * 1000);
+}
+
+function stopInactivityTimer() {
+    clearTimeout(_inactivityTimer);
+    _inactivityTimer = null;
+}
+
+function startInactivityTimer() {
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart', 'scroll', 'click'];
+    events.forEach(ev => document.addEventListener(ev, resetInactivityTimer, { passive: true }));
+    resetInactivityTimer();
 }
 
 async function initApp() {
@@ -215,6 +239,7 @@ async function initApp() {
     if (btnHist) btnHist.style.display = tienePermiso('ver_historico_tardanzas') ? '' : 'none';
 
     showView('dashboard');
+    startInactivityTimer();
 }
 
 function checkAuth() {
