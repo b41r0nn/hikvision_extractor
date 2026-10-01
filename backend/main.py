@@ -178,11 +178,21 @@ async def lifespan(app: FastAPI):
     if app_scheduler.running:
         app_scheduler.shutdown(wait=False)
 
+def _cors_origins() -> list[str]:
+    """
+    Lee CORS_ORIGINS del entorno: lista separada por comas.
+    Default: solo el frontend local (nginx en puerto 80 y 443).
+    Ejemplo en .env:
+        CORS_ORIGINS=http://192.168.1.250,https://asistencia.redihos.local
+    """
+    raw = os.getenv("CORS_ORIGINS", "http://192.168.1.250,http://localhost")
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
 app = FastAPI(title="API Asistencia Biométrica — REDIHOS", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
