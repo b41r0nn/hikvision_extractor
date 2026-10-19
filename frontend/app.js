@@ -1,7 +1,9 @@
 // ── Configuración ──────────────────────────────────────────────────────────
 // Usar el hostname de la URL actual para que funcione tanto en localhost
 // como accediendo por IP desde otro dispositivo de la red, sin hardcodear.
-const API = `http://${window.location.hostname}:8000/api`;
+// Ruta relativa: nginx hace proxy de /api/ al backend.
+// Esto permite que funcione tanto en HTTP (dev) como HTTPS (prod) sin cambios.
+const API = '/api';
 let pollingInterval = null;
 let syncInterval    = null;
 let todosEmpleados  = [];

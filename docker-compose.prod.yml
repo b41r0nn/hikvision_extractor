@@ -33,8 +33,9 @@ services:
       - .env
     environment:
       TZ: America/Bogota
-    ports:
-      - "8000:8000"
+    # El backend NO se expone al exterior: nginx hace proxy de /api/ internamente.
+    expose:
+      - "8000"
     networks:
       - hikvision_net
     healthcheck:
@@ -51,7 +52,8 @@ services:
     container_name: hikvision_frontend
     restart: always
     ports:
-      - "80:80"
+      - "80:80"    # redirige a HTTPS
+      - "443:443"  # HTTPS con certificado autofirmado
     depends_on:
       backend:
         condition: service_healthy

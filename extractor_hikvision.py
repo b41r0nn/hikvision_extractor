@@ -60,7 +60,7 @@ EVENT_MAP = {
 AUTH_MINORS = {38, 75, 104}
 
 # ── API ───────────────────────────────────────────────────────────────────────
-def fetch_range(start_iso, end_iso):
+def fetch_range(start_iso, end_iso, ip=IP, user=USER, password=PASS, url=URL):
     events, position, total_reported = [], 0, 0
     # searchID único por sesión de búsqueda: reutilizar el mismo ID entre
     # llamadas (incluso entre paginaciones) hace que el dispositivo
@@ -74,18 +74,18 @@ def fetch_range(start_iso, end_iso):
                 "startTime": start_iso, "endTime": end_iso,
             }}
             try:
-                r = requests.post(URL, json=payload,
-                                  auth=HTTPDigestAuth(USER, PASS), timeout=15)
+                r = requests.post(url, json=payload,
+                                  auth=HTTPDigestAuth(user, password), timeout=15)
                 r.raise_for_status()
                 data = r.json()
             except requests.exceptions.ConnectionError as e:
-                raise DeviceUnavailableError(f"Sin conexion a {IP}: {e}") from e
+                raise DeviceUnavailableError(f"Sin conexion a {ip}: {e}") from e
             except requests.exceptions.Timeout as e:
-                raise DeviceUnavailableError(f"Timeout conectando a {IP}: {e}") from e
+                raise DeviceUnavailableError(f"Timeout conectando a {ip}: {e}") from e
             except requests.exceptions.HTTPError as e:
-                raise DeviceUnavailableError(f"HTTP {e.response.status_code} desde {IP}") from e
+                raise DeviceUnavailableError(f"HTTP {e.response.status_code} desde {ip}") from e
             except requests.exceptions.RequestException as e:
-                raise DeviceUnavailableError(f"Fallo de red con {IP}: {e}") from e
+                raise DeviceUnavailableError(f"Fallo de red con {ip}: {e}") from e
 
             batch = data.get("AcsEvent", {}).get("InfoList", [])
             total = data.get("AcsEvent", {}).get("totalMatches", 0)
@@ -101,7 +101,7 @@ def fetch_range(start_iso, end_iso):
     return events, total_reported
 
 
-def fetch_day(day):
+def fetch_day(day, ip=IP, user=USER, password=PASS, url=URL):
     ds = day.strftime("%Y-%m-%d")
 
     def dedup(lst):
@@ -114,27 +114,34 @@ def fetch_day(day):
                 out.append(e)
         return out
 
-    full, total = fetch_range(f"{ds}T00:00:00", f"{ds}T23:59:59")
+    full, total = fetch_range(f"{ds}T00:00:00", f"{ds}T23:59:59",
+                              ip=ip, user=user, password=password, url=url)
     if len(full) >= total:
         return full, total
 
     print(f"  [!] {day}: total={total} obtenidos={len(full)} -> dividiendo AM/PM")
-    am, am_t = fetch_range(f"{ds}T00:00:00", f"{ds}T11:59:59")
-    pm, pm_t = fetch_range(f"{ds}T12:00:00", f"{ds}T23:59:59")
+    am, am_t = fetch_range(f"{ds}T00:00:00", f"{ds}T11:59:59",
+                           ip=ip, user=user, password=password, url=url)
+    pm, pm_t = fetch_range(f"{ds}T12:00:00", f"{ds}T23:59:59",
+                           ip=ip, user=user, password=password, url=url)
 
     combined = []
     if len(am) < am_t:
         print(f"  [!] {day} AM truncado -> Q1/Q2")
-        q1, _ = fetch_range(f"{ds}T00:00:00", f"{ds}T05:59:59")
-        q2, _ = fetch_range(f"{ds}T06:00:00", f"{ds}T11:59:59")
+        q1, _ = fetch_range(f"{ds}T00:00:00", f"{ds}T05:59:59",
+                            ip=ip, user=user, password=password, url=url)
+        q2, _ = fetch_range(f"{ds}T06:00:00", f"{ds}T11:59:59",
+                            ip=ip, user=user, password=password, url=url)
         combined.extend(q1 + q2)
     else:
         combined.extend(am)
 
     if len(pm) < pm_t:
         print(f"  [!] {day} PM truncado -> Q3/Q4")
-        q3, _ = fetch_range(f"{ds}T12:00:00", f"{ds}T17:59:59")
-        q4, _ = fetch_range(f"{ds}T18:00:00", f"{ds}T23:59:59")
+        q3, _ = fetch_range(f"{ds}T12:00:00", f"{ds}T17:59:59",
+                            ip=ip, user=user, password=password, url=url)
+        q4, _ = fetch_range(f"{ds}T18:00:00", f"{ds}T23:59:59",
+                            ip=ip, user=user, password=password, url=url)
         combined.extend(q3 + q4)
     else:
         combined.extend(pm)
@@ -149,7 +156,7 @@ def normalize(e):
         dt = datetime.fromisoformat(raw_t)
         event_date = dt.date()
         event_time = dt.time()
-    except:
+    except (ValueError, TypeError, AttributeError):
         event_date = None
         event_time = None
         
@@ -223,7 +230,6 @@ def parse_events(raw_data, day):
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 def main(start_str=None, end_str=None, progress_callback=None):
-    global IP, USER, PASS, URL
     p = argparse.ArgumentParser(description="Extractor Hikvision ISAPI -> Database")
     p.add_argument("--start",    default=hoy_bogota().strftime("%Y-%m-%d"))
     p.add_argument("--end",      default=hoy_bogota().strftime("%Y-%m-%d"))
@@ -232,15 +238,17 @@ def main(start_str=None, end_str=None, progress_callback=None):
     p.add_argument("--password", default=PASS)
     p.add_argument("--all",      action="store_true",
                    help="Incluir eventos de sistema ademas de personas")
-    
+
     # Parse args only if called from command line
     import sys
     args = p.parse_args() if __name__ == "__main__" else p.parse_args([])
 
-    IP   = args.ip
-    USER = args.user
-    PASS = args.password
-    URL  = f"http://{IP}/ISAPI/AccessControl/AcsEvent?format=json"
+    # Variables locales: no se modifican los módulo-level globals.
+    # fetch_range/fetch_day reciben estos valores como parámetros.
+    _ip   = args.ip
+    _user = args.user
+    _pass = args.password
+    _url  = f"http://{_ip}/ISAPI/AccessControl/AcsEvent?format=json"
 
     start_date = start_str if start_str else args.start
     end_date = end_str if end_str else args.end
@@ -250,7 +258,7 @@ def main(start_str=None, end_str=None, progress_callback=None):
 
     msg_init = f"Modo       : GUARDAR EN BASE DE DATOS\nDesde      : {start}\nHasta      : {end}"
     print(f"{'='*50}\n{msg_init}\n{'='*50}")
-    
+
     if progress_callback:
         progress_callback(f"Conectando al dispositivo para extraer desde {start} hasta {end}...")
 
@@ -259,14 +267,14 @@ def main(start_str=None, end_str=None, progress_callback=None):
     # sub-consulta. ICMP puede estar bloqueado por firewall del dispositivo,
     # por eso TCP al puerto HTTP es más confiable.
     try:
-        with socket.create_connection((IP, 80), timeout=3):
+        with socket.create_connection((_ip, 80), timeout=3):
             pass
     except (socket.timeout, ConnectionRefusedError, OSError) as e:
         msg = f"[ERROR] Biométrico no responde, abortando extracción ({e})"
         print(msg)
         if progress_callback:
             progress_callback(msg)
-        raise DeviceUnavailableError(f"Biométrico {IP}:80 no responde: {e}") from e
+        raise DeviceUnavailableError(f"Biométrico {_ip}:80 no responde: {e}") from e
 
     total_eventos = 0
     current = start
@@ -280,7 +288,9 @@ def main(start_str=None, end_str=None, progress_callback=None):
                 progress_callback(msg_day)
 
             try:
-                raw, total_esperado = fetch_day(current)
+                raw, total_esperado = fetch_day(
+                    current, ip=_ip, user=_user, password=_pass, url=_url
+                )
             except DeviceUnavailableError as e:
                 # Falla de red real: el día actual NO se pudo obtener.
                 # Hacemos rollback de lo que estuviera pendiente y detenemos

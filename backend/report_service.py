@@ -130,8 +130,8 @@ def _fusionar_marcas_por_empleado_dia(
         for r in regs[1:]:
             primero = grupo[0]
             delta = (
-                datetime.combine(hoy_bogota(), r.hora)
-                - datetime.combine(hoy_bogota(), primero.hora)
+                datetime.combine(r.fecha, r.hora)
+                - datetime.combine(primero.fecha, primero.hora)
             )
             if delta <= timedelta(minutes=ventana_minutos):
                 grupo.append(r)

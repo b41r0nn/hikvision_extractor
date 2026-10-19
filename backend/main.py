@@ -11,10 +11,13 @@ from contextlib import asynccontextmanager
 from datetime import date, datetime, time, timedelta, timezone
 from typing import List, Optional
 
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -41,11 +44,13 @@ from .timezone import hoy_bogota, ahora_bogota
 from .extraction_lock import (
     acquire_extraction_lock, release_extraction_lock, is_extracting,
 )
+from .logging_config import setup_logging
 import extractor_hikvision
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    setup_logging()
     # La migración de esquema es CRÍTICA: si falla, la app NO debe arrancar
     # con la BD desincronizada. Cualquier excepción aquí detiene el lifespan
     # y el contenedor se reiniciará (docker restart policy).
@@ -188,14 +193,19 @@ def _cors_origins() -> list[str]:
     raw = os.getenv("CORS_ORIGINS", "http://192.168.1.250,http://localhost")
     return [o.strip() for o in raw.split(",") if o.strip()]
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="API Asistencia Biométrica — REDIHOS", lifespan=lifespan)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins(),
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "Authorization"],
 )
 
 # ── Estado global de extracción ───────────────────────────────────────────────
@@ -406,7 +416,8 @@ def health_check():
 #  AUTENTICACIÓN
 # ══════════════════════════════════════════════════════════════════════════════
 @app.post("/api/auth/login")
-def login(req: LoginRequest, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+def login(request: Request, req: LoginRequest, db: Session = Depends(get_db)):
     user = db.query(models.Usuario).filter(models.Usuario.username == req.username).first()
     if not user or not verify_password(req.password, user.password_hash) or not user.activo:
         raise HTTPException(status_code=401, detail="Usuario o contraseña incorrectos")
@@ -696,7 +707,9 @@ def get_status(
     }
 
 @app.post("/api/extraer")
+@limiter.limit("5/minute")
 def forzar_extraccion(
+    request: Request,
     req: ExtraerRequest,
     background_tasks: BackgroundTasks,
     user: models.Usuario = Depends(require_perm("forzar_extraccion")),
@@ -705,6 +718,15 @@ def forzar_extraccion(
         return {"message": "Ya hay una extracción en curso."}
     inicio = req.fecha_inicio or hoy_bogota().isoformat()
     fin    = req.fecha_fin    or hoy_bogota().isoformat()
+    try:
+        d_inicio = date.fromisoformat(inicio)
+        d_fin    = date.fromisoformat(fin)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Formato de fecha inválido. Use YYYY-MM-DD.")
+    if d_inicio > d_fin:
+        raise HTTPException(status_code=400, detail="fecha_inicio no puede ser mayor que fecha_fin.")
+    if (d_fin - d_inicio).days > 365:
+        raise HTTPException(status_code=400, detail="El rango máximo permitido es 365 días.")
     background_tasks.add_task(ejecutar_extraccion, inicio, fin)
     return {"message": f"Extracción iniciada ({inicio} → {fin})."}
 

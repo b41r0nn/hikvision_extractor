@@ -14,3 +14,9 @@ argon2-cffi
 tzdata
 alembic
 cryptography
+slowapi>=0.5.7
+
+# Testing
+pytest>=8.0
+pytest-cov>=5.0
+httpx>=0.27
