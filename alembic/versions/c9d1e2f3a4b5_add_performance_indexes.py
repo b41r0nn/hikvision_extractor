@@ -23,10 +23,12 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     # Acelera obtener_horario_vigente(): filtra por turno_id + dia_semana +
     # vigente_desde DESC en calcular_tardanzas_acumulado (N+1 sin cache).
+    # if_not_exists=True: tolera que SQLAlchemy haya creado el índice antes.
     op.create_index(
         'ix_turno_horario_turno_dia_vigencia',
         'turno_horario',
         ['turno_id', 'dia_semana', 'vigente_desde'],
+        if_not_exists=True,
     )
 
     # Acelera config_service.get/set_*: la tabla configuracion se consulta
@@ -35,6 +37,7 @@ def upgrade() -> None:
         'ix_configuracion_clave',
         'configuracion',
         ['clave'],
+        if_not_exists=True,
     )
 
 
