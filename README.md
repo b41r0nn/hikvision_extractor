@@ -1,9 +1,11 @@
 # Sistema de Asistencia Biométrica — REDIHOS S.A.S
 
+> **Versión actual:** `v1.6-security-fixes`
+
 Sistema de control de asistencia para **REPRESENTACIONES Y DISTRIBUCIONES
 HOSPITALARIAS S.A.S. (REDIHOS)**. Extrae marcaciones de un dispositivo
 Hikvision mediante su API ISAPI, las almacena en **PostgreSQL**, expone una
-API REST con **FastAPI** y ofrece un panel web con **Nginx + HTML/JS**.
+API REST con **FastAPI** y ofrece un panel web con **Nginx + HTML/JS** sobre HTTPS.
 
 El sistema genera informes Excel con formato dinámico, calcula tardanzas,
 envía reportes automáticos por correo y permite administrar empleados,
@@ -15,12 +17,16 @@ roles, permisos y configuración de correo desde una interfaz web.
 
 ### 1.1 Servicios
 
-| Servicio      | Tecnología                       | Puerto expuesto | Responsabilidad                                                               |
-| ------------- | -------------------------------- | --------------- | ----------------------------------------------------------------------------- |
-| Base de datos | PostgreSQL 15 (Alpine)           | `5432`          | Persistencia de empleados, marcas, festivos, usuarios, roles y configuración. |
-| Backend API   | FastAPI + Uvicorn (Python 3.11)  | `8000`          | Extracción, reportes, autenticación, RBAC, scheduler y configuración.         |
-| Frontend      | Nginx + HTML/JS                  | `3000`          | Panel de login, dashboard, reportes y administración.                         |
-| Scheduler     | APScheduler (dentro del backend) | —               | Jobs de extracción diaria, sync de empleados y reportes semanal/mensual.      |
+| Servicio      | Tecnología                       | Puerto expuesto (prod)  | Responsabilidad                                                               |
+| ------------- | -------------------------------- | ----------------------- | ----------------------------------------------------------------------------- |
+| Base de datos | PostgreSQL 15 (Alpine)           | interno (no expuesto)   | Persistencia de empleados, marcas, festivos, usuarios, roles y configuración. |
+| Backend API   | FastAPI + Uvicorn (Python 3.11)  | interno (proxy nginx)   | Extracción, reportes, autenticación, RBAC, scheduler y configuración.         |
+| Frontend      | Nginx + HTML/JS                  | `80` (→443), `443` HTTPS| Panel de login, dashboard, reportes y administración. Hace proxy de `/api/`.  |
+| Scheduler     | APScheduler (dentro del backend) | —                       | Jobs de extracción diaria, sync de empleados y reportes semanal/mensual.      |
+
+> En producción el backend **no se expone directamente**: Nginx hace proxy de
+> `/api/` a `http://backend:8000/api/`. PostgreSQL tampoco es accesible desde fuera
+> de la red Docker interna.
 
 ### 1.2 Diagrama de flujo
 
@@ -52,7 +58,10 @@ roles, permisos y configuración de correo desde una interfaz web.
 ```text
 .
 ├── alembic/                        # Migraciones de base de datos
-│   └── versions/90d3e571a1b6_baseline_schema.py
+│   └── versions/
+│       ├── ...baseline_schema.py
+│       ├── b7c4e19a2f30_...py      # Unique constraint en registros_asistencia
+│       └── c9d1e2f3a4b5_add_performance_indexes.py  # Índices de performance (v1.6)
 ├── backend/
 │   ├── auth.py                     # JWT, Argon2id, RBAC
 │   ├── config_service.py           # Configuración persistente y alertas
@@ -60,7 +69,8 @@ roles, permisos y configuración de correo desde una interfaz web.
 │   ├── crypto_service.py           # Encriptación simétrica con Fernet
 │   ├── database.py                 # Conexión SQLAlchemy + SessionLocal
 │   ├── email_service.py            # Envío SMTP de reportes
-│   ├── main.py                     # API FastAPI y lifespan
+│   ├── logging_config.py           # Logging rotativo a /app/logs/app.log (v1.6)
+│   ├── main.py                     # API FastAPI, lifespan, rate limiting
 │   ├── models.py                   # Modelos SQLAlchemy
 │   ├── report_service.py           # Motor de Excel y tardanzas
 │   ├── scheduler.py                # Jobs programados con APScheduler
@@ -68,14 +78,21 @@ roles, permisos y configuración de correo desde una interfaz web.
 │   └── timezone.py                 # Helpers de zona horaria Bogotá
 ├── frontend/
 │   ├── index.html                  # UI del panel
-│   └── app.js                      # Lógica del frontend
+│   ├── app.js                      # Lógica del frontend (usa /api relativo para HTTPS)
+│   └── nginx.conf                  # Configuración Nginx: HTTPS, redirect, proxy /api/ (v1.6)
+├── tests/                          # Suite de tests automatizados (v1.6)
+│   ├── conftest.py                 # Fixtures SQLite en memoria, rollback por test
+│   ├── test_auth.py                # Tests de hash, JWT, RBAC (11 tests)
+│   ├── test_extractor.py           # Tests de normalize, fetch_range, save_to_db (12 tests)
+│   ├── test_report_service.py      # Tests de tardanzas, fusión de marcas (14 tests)
+│   └── test_api_endpoints.py       # Tests de integración REST (17 tests)
 ├── extractor_hikvision.py          # Script/CLI de extracción ISAPI
 ├── generar_informe.py              # CLI para generar Excel desde PostgreSQL
 ├── migrate_csv.py                  # CLI para migrar CSV de iVMS-4200 a PostgreSQL
-├── docker-compose.yml              # Orquestación de los 3 servicios
-├── docker-compose.prod.yml         # Orquestación de producción
+├── docker-compose.yml              # Orquestación de desarrollo
+├── docker-compose.prod.yml         # Orquestación de producción (HTTPS, backend interno)
 ├── backend.Dockerfile              # Imagen del backend
-├── frontend.Dockerfile             # Imagen del frontend
+├── frontend.Dockerfile             # Imagen del frontend (genera cert SSL auto-firmado)
 ├── backup.ps1                      # Backup manual/automático en Windows (PowerShell)
 ├── backup.sh                       # Backup manual/automático en Linux/WSL
 ├── .env.example                    # Variables de entorno documentadas
@@ -144,18 +161,24 @@ proceso falla al arrancar.
 Es el punto de entrada del backend. Define:
 
 - `lifespan(app)`: se ejecuta al arrancar Uvicorn y hace lo siguiente:
-  1. Ejecuta `alembic upgrade head` para migrar el esquema.
-  2. Puebla festivos colombianos (`init_festivos`).
-  3. Inicializa roles, permisos y usuario admin (`init_rbac`).
-  4. Crea configuración por defecto (`config_service.init_defaults`).
-  5. Si la última extracción exitosa es anterior a hoy, lanza un **backfill**
+  1. Configura el logging rotativo (`setup_logging()`).
+  2. Ejecuta `alembic upgrade head` para migrar el esquema.
+  3. Puebla festivos colombianos (`init_festivos`).
+  4. Inicializa roles, permisos y usuario admin (`init_rbac`).
+  5. Crea configuración por defecto (`config_service.init_defaults`).
+  6. Si la última extracción exitosa es anterior a hoy, lanza un **backfill**
      en segundo plano para recuperar los días faltantes.
-  6. Inicia el scheduler de APScheduler.
-- Middleware CORS para permitir llamadas desde el frontend.
+  7. Inicia el scheduler de APScheduler.
+- **Rate limiting** con `slowapi`: `10 req/min` en `/api/auth/login` y
+  `5 req/min` en `/api/extraer`. Devuelve `429 Too Many Requests` al superarlo.
+- Middleware CORS con métodos y headers explícitos: solo `GET, POST, PUT, DELETE`
+  y `Content-Type, Authorization`.
 - Endpoints agrupados por dominio: autenticación, roles, usuarios, empleados,
   registros, KPIs, reportes, configuración de correo y extracción manual.
 - Estados globales `extraction_state` y `sync_state` para que el frontend
   pueda consultar el progreso de operaciones en background.
+- Validación de rango de fechas en `/api/extraer`: formato ISO, orden
+  cronológico y máximo 365 días.
 
 ### 4.2 `backend/auth.py` — Autenticación y autorización
 
@@ -283,7 +306,12 @@ Puede ejecutarse como script independiente o ser llamado desde el backend.
 
 #### 4.11.1 Conectividad y autenticación
 
-- Lee `DEVICE_IP`, `DEVICE_USER`, `DEVICE_PASS` del `.env`.
+- Lee `DEVICE_IP`, `DEVICE_USER`, `DEVICE_PASS` del `.env` como valores por
+  defecto, pero los acepta también como parámetros (`ip`, `user`, `password`,
+  `url`) en `fetch_range()`, `fetch_day()` y `main()`.
+- **Los globales `IP`, `USER`, `PASS`, `URL` nunca se mutan** en tiempo de
+  ejecución: `main()` usa variables locales en lugar de `global`. Esto permite
+  llamadas concurrentes con distintas credenciales sin condición de carrera.
 - Usa autenticación HTTP Digest contra `http://<IP>/ISAPI/AccessControl/AcsEvent?format=json`.
 - Antes de extraer un rango, hace un `socket.create_connection((IP, 80), timeout=3)`
   para detectar rápidamente si el dispositivo no responde.
@@ -390,23 +418,41 @@ Puede ejecutarse como script independiente o ser llamado desde el backend.
 
 ## 6. Logs y monitoreo
 
-### 6.1 Dónde se imprimen los logs
+### 6.1 Dónde se escriben los logs
 
-- El backend usa `print()` para logs de operación. Uvicorn los envía a stdout.
-- En Docker se ven con:
+El backend tiene **logging dual**: stdout (visible con `docker compose logs`) y
+archivo rotativo (`/app/logs/app.log` dentro del contenedor).
 
-  ```bash
-  docker compose logs -f backend
-  ```
+#### Archivo rotativo (`backend/logging_config.py`)
 
-- Los logs incluyen prefijos claros:
-  - `[SCHEDULER]` para jobs programados.
-  - `[EXTRACCION]` para extracciones manuales/backfill.
-  - `[BACKFILL]` para el backfill de arranque.
-  - `[BACKFILL WATCHDOG]` si el watchdog mató el proceso.
-  - `[SYNC EMPLEADOS]` para sincronización.
-  - `[EMAIL]` para envío de correos.
-  - `[MIGRACIONES]`, `[FESTIVOS]`, `[RBAC]`, `[CONFIG]` para el lifespan.
+- Ruta: `/app/logs/app.log` (fallback `./logs/app.log` fuera de Docker).
+- Rotación automática: máximo **10 MB** por archivo, **5 copias** de historial.
+- Codificación: UTF-8.
+- Captura logs de: `uvicorn`, `sqlalchemy`, `apscheduler`, `backend.*`.
+- `sqlalchemy.engine` y `passlib` reducidos a nivel `WARNING` para no saturar
+  el archivo con SQL de cada consulta.
+
+Para leer el log dentro del contenedor:
+
+```bash
+docker compose exec backend tail -f /app/logs/app.log
+```
+
+#### Stdout (Docker)
+
+```bash
+docker compose logs -f backend
+```
+
+Los logs incluyen prefijos claros:
+- `[SCHEDULER]` para jobs programados.
+- `[EXTRACCION]` para extracciones manuales/backfill.
+- `[BACKFILL]` para el backfill de arranque.
+- `[BACKFILL WATCHDOG]` si el watchdog mató el proceso.
+- `[SYNC EMPLEADOS]` para sincronización.
+- `[EMAIL]` para envío de correos.
+- `[MIGRACIONES]`, `[FESTIVOS]`, `[RBAC]`, `[CONFIG]` para el lifespan.
+- `[LOGGING]` al inicializar el handler del archivo rotativo.
 
 ### 6.2 Estado del sistema
 
@@ -443,7 +489,40 @@ en el código**. El repositorio incluye `.env.example` y `.gitignore` ignora el
 - Si `FERNET_KEY` o `DATABASE_URL` no están configuradas, el backend falla al
   arrancar con un mensaje claro (fail-loud).
 
-### 7.2 JWT
+### 7.2 HTTPS
+
+En producción el tráfico va **siempre por HTTPS** gracias a nginx:
+
+- Certificado **auto-firmado** generado en tiempo de build del contenedor
+  (`frontend.Dockerfile`) para la IP `192.168.1.250` (SAN incluida).
+- Duración del cert: 10 años (`-days 3650`).
+- Protocolos: TLS 1.2 y 1.3 únicamente.
+- HTTP (puerto 80) redirige permanentemente (301) a HTTPS.
+- Headers de seguridad: `Strict-Transport-Security`, `X-Frame-Options`,
+  `X-Content-Type-Options`.
+- El frontend usa la ruta relativa `/api` (no `http://host:8000/api`) para
+  evitar mixed-content en HTTPS.
+
+> Los navegadores mostrarán advertencia de certificado por ser auto-firmado.
+> Agregar excepción manualmente o instalar el cert en el almacén del SO.
+
+### 7.3 Rate Limiting
+
+`slowapi` protege los endpoints más sensibles:
+
+| Endpoint | Límite |
+|----------|--------|
+| `POST /api/auth/login` | 10 req/min por IP |
+| `POST /api/extraer` | 5 req/min por IP |
+
+Al superar el límite devuelve `429 Too Many Requests`.
+
+### 7.4 CORS
+
+Solo se permiten los orígenes definidos en `CORS_ORIGINS` (`.env`), con métodos
+`GET, POST, PUT, DELETE` y headers `Content-Type, Authorization`.
+
+### 7.5 JWT
 
 - `SECRET_KEY` firma los tokens. En producción debe generarse con:
 
@@ -454,7 +533,7 @@ en el código**. El repositorio incluye `.env.example` y `.gitignore` ignora el
 - `ACCESS_TOKEN_EXPIRE_MINUTES` controla la expiración (default 8 horas).
 - Los tokens se pasan en el header `Authorization: Bearer <token>`.
 
-### 7.3 Contraseñas
+### 7.6 Contraseñas
 
 - Hasheadas con Argon2id.
 - Los usuarios creados por el admin y los sembrados desde `.env` nacen con
@@ -462,7 +541,7 @@ en el código**. El repositorio incluye `.env.example` y `.gitignore` ignora el
 - El endpoint `POST /api/auth/cambiar-password` permite al usuario cambiar su
   propia contraseña después de validar la actual.
 
-### 7.4 RBAC
+### 7.7 RBAC
 
 - Cada endpoint protegido exige un permiso específico con `require_perm()`.
 - El frontend oculta o muestra pestañas según los permisos del usuario.
@@ -518,32 +597,47 @@ python -c "import secrets; print(secrets.token_urlsafe(32))"
 # Pegar el resultado en SECRET_KEY del .env
 ```
 
-### 9.2 Levantar con Docker
+### 9.2 Levantar con Docker (desarrollo)
 
 ```bash
 docker compose up -d --build
 ```
 
-Servicios disponibles:
+Servicios disponibles en desarrollo:
 
 - Frontend: `http://localhost:3000`
 - API docs: `http://localhost:8000/docs`
 - API: `http://localhost:8000`
 
-### 9.3 Actualizar solo el backend
+### 9.3 Deploy en producción
 
 ```bash
-docker compose build --no-cache backend
-docker compose up -d backend
+# Usar siempre docker-compose.prod.yml en producción:
+docker compose -f docker-compose.prod.yml build --no-cache
+docker compose -f docker-compose.prod.yml up -d
 ```
 
-### 9.4 Reiniciar el frontend
+Servicios disponibles en producción:
+
+- Frontend HTTPS: `https://<IP_SERVIDOR>` (cert auto-firmado)
+- HTTP → HTTPS redirect: `http://<IP_SERVIDOR>` (redirige a HTTPS automáticamente)
+- API: solo accesible internamente vía nginx en `/api/`
+- PostgreSQL: solo accesible internamente en la red Docker
+
+### 9.4 Actualizar solo el backend
 
 ```bash
-docker compose up -d --force-recreate frontend
+docker compose -f docker-compose.prod.yml build --no-cache backend
+docker compose -f docker-compose.prod.yml up -d backend
 ```
 
-### 9.5 Deploy en producción (Ubuntu Server)
+### 9.5 Reiniciar el frontend
+
+```bash
+docker compose -f docker-compose.prod.yml up -d --force-recreate frontend
+```
+
+### 9.6 Deploy en producción (Ubuntu Server — guía completa)
 
 Para migrar el sistema completo (código, base de datos y configuración) a un
 servidor Ubuntu Server con Docker, seguir la guía detallada:
@@ -556,8 +650,8 @@ configuración de DNS, backups automáticos con `cron`, troubleshooting y
 checklist de seguridad.
 
 > **Importante:** en producción usar siempre `docker-compose.prod.yml`, que no
-> expone PostgreSQL al exterior, no usa bind mounts y no arranca Uvicorn con
-> `--reload`.
+> expone PostgreSQL ni el backend directamente, no usa bind mounts, no arranca
+> Uvicorn con `--reload` y habilita HTTPS con nginx.
 
 ---
 
@@ -578,14 +672,15 @@ python migrate_csv.py legacy/eventos.csv
 ### 10.3 Forzar extracción vía API
 
 ```bash
-# Login
-curl -X POST http://localhost:8000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"admin","password":"Ingreso2026*"}'
+# Login (en producción usar https:// y -k para cert auto-firmado)
+curl -X POST https://192.168.1.250/api/auth/login \
+  -k -H "Content-Type: application/json" \
+  -d '{"username":"admin","password":"<TU_PASSWORD>"}'
 
 # Extracción manual (usar el token del paso anterior)
-curl -X POST http://localhost:8000/api/extraer \
-  -H "Content-Type: application/json" \
+# Rango máximo: 365 días. fecha_inicio debe ser <= fecha_fin.
+curl -X POST https://192.168.1.250/api/extraer \
+  -k -H "Content-Type: application/json" \
   -H "Authorization: Bearer <TOKEN>" \
   -d '{"fecha_inicio":"2026-07-01","fecha_fin":"2026-07-31"}'
 ```
@@ -593,9 +688,12 @@ curl -X POST http://localhost:8000/api/extraer \
 ### 10.4 Ver logs en tiempo real
 
 ```bash
-docker compose logs -f backend
-docker compose logs -f db
-docker compose logs -f frontend
+# Stdout de contenedores
+docker compose -f docker-compose.prod.yml logs -f backend
+docker compose -f docker-compose.prod.yml logs -f frontend
+
+# Archivo rotativo dentro del contenedor backend
+docker exec hikvision_backend tail -f /app/logs/app.log
 ```
 
 ### 10.5 Conectarse a la base de datos
@@ -680,8 +778,24 @@ Luego conectate como si fuera `localhost`.
 ### 10.6 Ejecutar migraciones manualmente
 
 ```bash
-docker compose exec backend alembic upgrade head
+docker compose -f docker-compose.prod.yml exec backend alembic upgrade head
 ```
+
+### 10.7 Ejecutar tests
+
+```bash
+# Requiere Python con dependencias instaladas (venv o global)
+pip install -r requirements.txt
+
+# Todos los tests con cobertura
+python -m pytest tests/ -v --cov=backend --cov=extractor_hikvision --cov-report=term-missing
+
+# Solo un módulo
+python -m pytest tests/test_api_endpoints.py -v
+```
+
+Los tests usan **SQLite en memoria** (`StaticPool`) para no requerir PostgreSQL.
+Las variables de entorno necesarias se configuran automáticamente en `conftest.py`.
 
 ### 10.7 Backup y restauración local
 
@@ -744,7 +858,14 @@ cp backups/.env.backup .env
 - **Zona horaria explícita**: todo el negocio usa `America/Bogota` mediante
   `backend/timezone.py`.
 - **RBAC granular**: permisos almacenados en base de datos; endpoints protegidos.
-- **Hashes seguros**: Argon2id para contraseñas.
+- **Hashes seguros**: Argon2id para contraseñas (passlib + argon2-cffi).
+- **Encriptación en reposo**: contraseña SMTP guardada cifrada con Fernet (AES-128).
+- **HTTPS en producción**: nginx con TLS 1.2/1.3 y cert auto-firmado para IP local;
+  HTTP redirige automáticamente a HTTPS.
+- **Rate limiting**: protección brute-force en login y extracción manual.
+- **CORS restrictivo**: solo origins, methods y headers necesarios.
+- **Sin mutación de globales**: `extractor_hikvision.py` usa parámetros en lugar
+  de `global IP, USER, PASS, URL`; permite llamadas concurrentes seguras.
 - **Serialización del acceso al biométrico**: `device_lock` (`backend/device_lock.py`)
   evita llamadas HTTP concurrentes al biométrico, ya sea por extracción de marcas
   o sincronización de empleados.
@@ -754,9 +875,9 @@ cp backups/.env.backup .env
 - **Recuperación ante fallos**: backfill día por día, rollback parcial ante falla
   de red, watchdog de backfill y `misfire_grace_time` correcto en APScheduler.
 - **Migraciones versionadas**: Alembic gestiona el esquema de base de datos.
-- **Tests de evidencia**: la carpeta `test_evidencia/` contiene scripts
-  reproducibles que verifican comportamientos críticos (misfire, backfill,
-  seguridad, concurrencia).
+- **Logging persistente**: archivo rotativo 10 MB × 5 copias en `/app/logs/app.log`.
+- **Suite de tests automatizados**: 56 tests con SQLite en memoria; corren sin
+  PostgreSQL ni biométrico; CI-friendly.
 
 ---
 
@@ -777,23 +898,33 @@ cp backups/.env.backup .env
 
 ---
 
-## 13. Pendientes antes del primer deploy en producción
+## 13. Historial de versiones
 
-1. Cambiar `ADMIN_PASSWORD` en `.env` y resetear el usuario admin contra la
-   base de datos PostgreSQL real.
-2. Generar un `SECRET_KEY` real y reemplazarlo en `.env`.
-3. Generar un `FERNET_KEY` real y guardarlo en `.env`.
-4. Configurar credenciales SMTP reales desde el panel Admin y un destinatario.
-5. Cargar/verificar los empleados reales de REDIHOS en la tabla `empleados`.
-6. Realizar una validación visual del frontend en navegador.
+| Versión | Fecha | Cambios principales |
+|---------|-------|---------------------|
+| `v1.6-security-fixes` | 2026-10-19 | Rate limiting (slowapi), HTTPS auto-signed + nginx proxy, CORS restrictivo, logging rotativo, refactor globales extractor, fix fusión de marcas (bug `hoy_bogota()`), índices de performance en BD, suite de 56 tests |
+| `v1.5` | 2026-09-29 | Correcciones varias, backup scripts |
+| `v1.0` | 2026-08-xx | Deploy inicial en producción Ubuntu |
+
+## 14. Pendientes operacionales
+
+1. **Rotar credenciales** del `.env` en producción: `ADMIN_PASSWORD`,
+   `SECRET_KEY`, `FERNET_KEY`, `DEVICE_PASS`, `POSTGRES_PASSWORD`.
+   > El certificado SSL auto-firmado requiere aceptación manual en el navegador.
+   > Para eliminar la advertencia, instalar el cert en el almacén del SO o usar
+   > un certificado de una CA privada interna.
+2. Verificar que el servidor SMTP esté configurado en el panel Admin y que los
+   reportes automáticos lleguen correctamente.
+3. Confirmar que todos los empleados activos tienen `turno_id` asignado (sin turno
+   no se calculan tardanzas).
 
 ---
 
-## 14. Documentación adicional
+## 15. Documentación adicional
 
 - `handoff_hikvision_asistencia.md`: notas internas de handoff, decisiones de
   negocio, evidencia de pruebas y próximos pasos.
 - `MIGRACION_UBUNTU.md`: guía paso a paso para migrar el sistema a un servidor
   Ubuntu Server con Docker en producción.
 - `http://localhost:8000/docs`: documentación interactiva de la API generada
-  automáticamente por FastAPI.
+  automáticamente por FastAPI (solo disponible en desarrollo).
