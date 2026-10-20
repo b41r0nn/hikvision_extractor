@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <radialGradient id="g" cx="0.38" cy="0.3" r="0.8">
+      <stop offset="0" stop-color="#1F74C9"/>
+      <stop offset="0.55" stop-color="#0156A9"/>
+      <stop offset="1" stop-color="#003F80"/>
+    </radialGradient>
+    <clipPath id="c"><circle cx="32" cy="32" r="31"/></clipPath>
+  </defs>
+  <circle cx="32" cy="32" r="31" fill="url(#g)"/>
+  <g clip-path="url(#c)">
+    <path fill="#F7811F" d="M4 64 C4 38 16 18 41 9 C22 19 12 38 11 64 Z"/>
+    <path fill="#F7811F" d="M14 64 C14 42 23 26 41 17 C27 27 20 42 20 64 Z"/>
+  </g>
+  <path fill="#fff" transform="translate(22.999 47.500) scale(0.02115 -0.02115)" d="M392 0H90L397 1466H1048Q1216 1466 1309.5 1431.5Q1403 1397 1460.5 1305.0Q1518 1213 1518 1082Q1518 895 1406.0 773.5Q1294 652 1067 623Q1125 571 1176 486Q1277 314 1401 0H1077Q1038 124 924 387Q862 529 792 578Q749 607 642 607H519ZM565 827H725Q968 827 1047.5 856.0Q1127 885 1172.0 947.0Q1217 1009 1217 1077Q1217 1157 1152 1197Q1112 1221 979 1221H647Z"/>
+</svg>

@@ -79,6 +79,10 @@ roles, permisos y configuración de correo desde una interfaz web.
 ├── frontend/
 │   ├── index.html                  # UI del panel
 │   ├── app.js                      # Lógica del frontend (usa /api relativo para HTTPS)
+│   ├── logo.png                    # Logo REDIHOS (login y sidebar)
+│   ├── favicon.svg                 # Favicon vectorial (navegadores modernos)
+│   ├── favicon.ico                 # Favicon 16/32/48 px (fallback y /favicon.ico)
+│   ├── apple-touch-icon.png        # Ícono 180 px para accesos directos en iOS/Android
 │   └── nginx.conf                  # Configuración Nginx: HTTPS, redirect, proxy /api/ (v1.6)
 ├── tests/                          # Suite de tests automatizados (v1.6)
 │   ├── conftest.py                 # Fixtures SQLite en memoria, rollback por test
