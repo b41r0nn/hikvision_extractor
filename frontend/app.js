@@ -27,9 +27,9 @@ function showToast(msg, type = 'info') {
     const toast = document.getElementById('toast');
     const inner = document.getElementById('toast-inner');
     const colors = {
-        info:    'background:rgba(30,58,138,0.95); color:#93c5fd; border:1px solid rgba(59,130,246,0.3)',
-        success: 'background:rgba(6,78,59,0.95); color:#4ade80; border:1px solid rgba(34,197,94,0.3)',
-        error:   'background:rgba(127,29,29,0.95); color:#f87171; border:1px solid rgba(239,68,68,0.3)',
+        info:    'background:rgba(24,28,45,0.96); color:#6dd5fa; border:1px solid rgba(86,204,242,0.4); box-shadow:0 12px 30px rgba(0,0,0,0.65), 0 0 18px rgba(86,204,242,0.16)',
+        success: 'background:rgba(15,32,27,0.96); color:#34e59e; border:1px solid rgba(52,229,158,0.42); box-shadow:0 12px 30px rgba(0,0,0,0.65), 0 0 18px rgba(52,229,158,0.18)',
+        error:   'background:rgba(40,17,27,0.96); color:#fb7185; border:1px solid rgba(251,113,133,0.42); box-shadow:0 12px 30px rgba(0,0,0,0.65), 0 0 18px rgba(244,63,94,0.18)',
     };
     inner.style.cssText = colors[type] || colors.info;
     inner.textContent   = msg;
@@ -661,7 +661,7 @@ function renderDeptFilter() {
         return;
     }
     cont.innerHTML = todosDeptos.map(d => `
-        <label class="flex items-center gap-1.5 cursor-pointer px-3 py-1 rounded-full border border-slate-600 hover:border-sky-500 text-xs text-slate-300 hover:text-sky-300 transition-all">
+        <label class="flex items-center gap-1.5 cursor-pointer px-3 py-1 rounded-full border border-white/10 bg-[#111320] hover:border-[#34e59e]/50 text-xs text-slate-300 hover:text-[#34e59e] transition-all">
             <input type="checkbox" class="dept-chk emp-checkbox" value="${escapeHtml(d)}"
                    onchange="filtrarPorDept()"> ${escapeHtml(d)}
         </label>`).join('');
@@ -927,7 +927,7 @@ function mostrarFormTurno() {
     document.getElementById('turno-salida').value = '';
     const grid = document.getElementById('turno-horarios-grid');
     grid.innerHTML = DIAS_SEMANA.map((dia, idx) => `
-        <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-2">
+        <div class="p-3.5 rounded-xl bg-[#111320] border border-white/[0.08] space-y-2">
             <p class="text-xs font-semibold text-slate-300">${dia}</p>
             <div>
                 <label class="text-[10px] text-slate-400">Entrada</label>
@@ -984,7 +984,7 @@ async function editarTurno(id) {
         grid.innerHTML = DIAS_SEMANA.map((dia, idx) => {
             const h = t.horarios_hoy[idx] || { hora_entrada: '07:30', tolerancia_minutos: 10 };
             return `
-            <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-2">
+            <div class="p-3.5 rounded-xl bg-[#111320] border border-white/[0.08] space-y-2">
                 <p class="text-xs font-semibold text-slate-300">${dia}</p>
                 <div>
                     <label class="text-[10px] text-slate-400">Entrada</label>
@@ -1313,11 +1313,11 @@ async function cargarUsuariosRoles() {
                 <td class="text-xs text-slate-300">
                     <div class="flex flex-wrap gap-1">
                         ${perms.map(p => `
-                            <label class="inline-flex items-center gap-1 px-2 py-0.5 rounded border ${permisosAsignados.includes(p.nombre) ? 'border-sky-500/50 bg-sky-500/10' : 'border-slate-600'} cursor-pointer">
+                            <label class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border ${permisosAsignados.includes(p.nombre) ? 'border-[#34e59e]/45 bg-[#34e59e]/10 text-white' : 'border-white/10 bg-[#111320] text-slate-400'} cursor-pointer transition-all">
                                 <input type="checkbox" ${permisosAsignados.includes(p.nombre) ? 'checked' : ''}
                                        onchange="togglePermisoRol(${r.id}, ${p.id}, this.checked)"
                                        class="emp-checkbox">
-                                <span class="text-slate-400">${escapeHtml(p.nombre)}</span>
+                                <span>${escapeHtml(p.nombre)}</span>
                             </label>
                         `).join('')}
                     </div>

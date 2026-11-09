@@ -819,3 +819,19 @@ Buen trabajo hoy — fue una sesión larga y con un susto real en el medio (pér
 3. Monitorear el primer disparo real del scheduler (`extraccion_periodica`, `reporte_semanal`, `reporte_mensual`).
 
 Cuando se retome, sea para configurar el correo real o para nuevos fixes, se sigue el mismo circuito de siempre.
+
+---
+
+## Fase 4: Rediseño cosmético UI/UX estilo Puzzle y firma destacada (9 nov 2026)
+
+Se aplicó una actualización exclusivamente cosmética sobre el frontend (`frontend/index.html` y clases visuales en `frontend/app.js`) sin alterar endpoints, IDs del DOM, lógica de negocio, permisos ni textos existentes:
+
+| # | Componente | Detalle de los cambios |
+| --- | --- | --- |
+| 4.1 | Paleta y superficies (`.glass`, `.kpi-card`) | Fondo principal abisal `#07080d` con iluminación ambiental radial sutil; tarjetas de doble bisel (`#0d0f18` → `#141726`) con borde luminoso superior y sombras profundas. |
+| 4.2 | Tipografía | Incorporación de `Plus Jakarta Sans` e `Inter` para encabezados, métricas KPI y controles. |
+| 4.3 | Botones y acciones (`.btn-*`) | Botón primario en verde menta sólido (`#34e59e` → `#1fd18a`) con texto oscuro `#05140d` en negrita y resplandor suave; botones secundarios oscuros con bisel e iluminado cian al pasar el cursor. |
+| 4.4 | Navegación y pestañas (`.nav-item`, `.puzzle-tabs`, `.tab-btn`) | Ítems del sidebar en formato píldora con punto indicador verde menta brillante (`box-shadow: 0 0 10px #34e59e`) en el estado activo; barras de pestañas en Reportes y Administración encapsuladas en contenedor `.puzzle-tabs` con pestaña activa elevada y halo luminoso. |
+| 4.5 | Formularios, tablas y badges (`.form-input`, `.data-table`, `.badge-*`) | Campos de entrada empotrados (`#080a11`) con foco verde menta; tablas con cabeceras oscuras (`#0a0c14`) y divisores sutiles; insignias tipo píldora en verde menta, ámbar cálido (`#f5c451`), coral (`#fb7185`) y cian eléctrico (`#56ccf2`). |
+| 4.6 | Firma del autor destacada (`.pie-autor`) | Pie de página con mayor jerarquía visual y tamaño (estilo `pdf_tooloffice`) en la pantalla de login, pie del sidebar y pie de la vista principal: título `Sistema Biométrico v3.0`, nombre del autor **`Bairon Calle Rivera`** en blanco y negrita destacada, y enlace `mailto:b41r0nn@gmail.com` en dorado cálido (`#fcd34d`) subrayado. |
+

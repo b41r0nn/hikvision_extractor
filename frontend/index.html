@@ -9,106 +9,417 @@
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-base:    #0b1120;
-            --bg-panel:   rgba(17, 28, 52, 0.85);
-            --border:     rgba(99, 179, 237, 0.12);
-            --accent:     #3b82f6;
-            --accent-glow:rgba(59,130,246,0.35);
+            --bg-base:       #0d0f18;
+            --bg-elevated:   #141726;
+            --bg-panel:      linear-gradient(165deg, rgba(29, 32, 48, 0.95) 0%, rgba(20, 22, 35, 0.96) 100%);
+            --bg-subcard:    linear-gradient(180deg, rgba(35, 39, 58, 0.72) 0%, rgba(23, 26, 40, 0.88) 100%);
+            --bg-input:      #111320;
+            --border:        rgba(255, 255, 255, 0.085);
+            --border-strong: rgba(255, 255, 255, 0.15);
+            --accent:        #34e59e;
+            --accent-glow:   rgba(52, 229, 158, 0.32);
+            --cyan:          #56ccf2;
+            --violet:        #8b7cf6;
+            --amber:         #f5c451;
+            --coral:         #fb7185;
+            --text-main:     #eef1f8;
+            --text-Soft:     #9ca3c0;
+            --text-muted:    #6e7694;
         }
         * { box-sizing: border-box; }
         body {
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
             background-color: var(--bg-base);
             background-image:
-                radial-gradient(ellipse at 20% 20%, rgba(30,64,175,0.15) 0%, transparent 60%),
-                radial-gradient(ellipse at 80% 80%, rgba(124,58,237,0.10) 0%, transparent 60%);
-            color: #e2e8f0;
+                radial-gradient(ellipse 65% 50% at 18% 12%, rgba(139, 124, 246, 0.09) 0%, transparent 65%),
+                radial-gradient(ellipse 55% 45% at 85% 85%, rgba(52, 229, 158, 0.06) 0%, transparent 65%),
+                radial-gradient(ellipse 50% 40% at 55% 20%, rgba(86, 204, 242, 0.05) 0%, transparent 60%);
+            color: var(--text-main);
             min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
         }
+        h1, h2, h3, .kpi-value {
+            font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+            letter-spacing: -0.02em;
+        }
+
+        /* Tarjetas estilo Puzzle: doble bisel oscuro + brillo especular superior */
         .glass {
             background: var(--bg-panel);
-            backdrop-filter: blur(16px);
+            backdrop-filter: blur(20px);
             border: 1px solid var(--border);
-            border-radius: 16px;
+            border-radius: 20px;
+            box-shadow:
+                inset 0 1px 0 0 rgba(255, 255, 255, 0.11),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+                0 16px 36px -10px rgba(0, 0, 0, 0.72),
+                0 0 0 3px rgba(9, 10, 17, 0.82);
         }
-        .glass-sm { border-radius: 10px; }
+        .glass-sm { border-radius: 14px; }
 
-        /* Sidebar */
-        #sidebar { width: 240px; min-height: 100vh; background: rgba(10,18,36,0.95); border-right: 1px solid var(--border); }
-        .nav-item { display:flex; align-items:center; gap:10px; padding:10px 16px; border-radius:8px; cursor:pointer; transition:all .2s; color:#94a3b8; font-size:14px; font-weight:500; margin-bottom:4px; }
-        .nav-item:hover, .nav-item.active { background:rgba(59,130,246,0.15); color:#93c5fd; }
-        .nav-item.active { border-left: 3px solid #3b82f6; }
+        /* Sidebar estilo dock Puzzle */
+        #sidebar {
+            width: 256px;
+            min-height: 100vh;
+            background: linear-gradient(180deg, #151827 0%, #0e101b 100%);
+            border-right: 1px solid var(--border);
+            box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03), 8px 0 30px rgba(0, 0, 0, 0.45);
+        }
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            padding: 11px 16px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all .2s ease;
+            color: #949cb8;
+            font-size: 13.5px;
+            font-weight: 500;
+            margin-bottom: 6px;
+            border: 1px solid transparent;
+            position: relative;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.04);
+            color: #e2e8f0;
+            border-color: rgba(255, 255, 255, 0.07);
+        }
+        .nav-item.active {
+            background: linear-gradient(180deg, #24283e 0%, #1a1d2e 100%);
+            color: #ffffff;
+            font-weight: 600;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.14),
+                0 6px 18px -4px rgba(0, 0, 0, 0.6),
+                0 0 18px rgba(139, 124, 246, 0.18);
+        }
+        .nav-item.active svg {
+            color: var(--accent);
+            filter: drop-shadow(0 0 6px rgba(52, 229, 158, 0.55));
+        }
+        .nav-item.active::after {
+            content: '';
+            margin-left: auto;
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: var(--accent);
+            box-shadow: 0 0 10px var(--accent);
+        }
 
-        /* KPI Cards */
-        .kpi-card { background:linear-gradient(135deg,rgba(17,28,52,0.9),rgba(30,41,80,0.7)); border:1px solid var(--border); border-radius:12px; padding:20px; }
-        .kpi-value { font-size:2.4rem; font-weight:700; line-height:1; }
-        .kpi-late  { color:#fb923c; }
-        .kpi-ok    { color:#34d399; }
-        .kpi-blue  { color:#60a5fa; }
-        .kpi-gray  { color:#94a3b8; }
+        /* KPI Cards estilo financiero Puzzle */
+        .kpi-card {
+            background: var(--bg-subcard);
+            border: 1px solid rgba(255, 255, 255, 0.085);
+            border-radius: 16px;
+            padding: 20px 22px;
+            position: relative;
+            overflow: hidden;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.10),
+                0 12px 28px -8px rgba(0, 0, 0, 0.6),
+                0 0 0 2px rgba(10, 11, 18, 0.75);
+            transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+        }
+        .kpi-card:hover {
+            transform: translateY(-2px);
+            border-color: rgba(255, 255, 255, 0.15);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.15),
+                0 16px 32px -8px rgba(0, 0, 0, 0.72),
+                0 0 22px rgba(139, 124, 246, 0.10);
+        }
+        .kpi-value {
+            font-size: 2.25rem;
+            font-weight: 700;
+            line-height: 1.05;
+            font-variant-numeric: tabular-nums;
+        }
+        .kpi-late  { color: var(--amber); text-shadow: 0 0 24px rgba(245, 196, 81, 0.22); }
+        .kpi-ok    { color: var(--accent); text-shadow: 0 0 24px rgba(52, 229, 158, 0.24); }
+        .kpi-blue  { color: var(--cyan); text-shadow: 0 0 24px rgba(86, 204, 242, 0.22); }
+        .kpi-gray  { color: #9ca3c0; }
 
-        /* Buttons */
-        .btn-primary { background:linear-gradient(135deg,#2563eb,#1d4ed8); color:white; padding:8px 18px; border-radius:8px; font-weight:600; font-size:13px; border:none; cursor:pointer; transition:all .2s; display:inline-flex; align-items:center; gap:6px; }
-        .btn-primary:hover { background:linear-gradient(135deg,#3b82f6,#2563eb); box-shadow:0 0 20px var(--accent-glow); transform:translateY(-1px); }
-        .btn-primary:disabled { opacity:.5; cursor:not-allowed; transform:none; }
-        .btn-danger  { background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.3); color:#f87171; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; }
-        .btn-danger:hover { background:rgba(239,68,68,0.25); }
-        .btn-warning { background:rgba(234,179,8,0.12); border:1px solid rgba(234,179,8,0.3); color:#facc15; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; transition:all .2s; }
-        .btn-warning:hover { background:rgba(234,179,8,0.22); }
-        .btn-success { background:rgba(34,197,94,0.15); border:1px solid rgba(34,197,94,0.3); color:#4ade80; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; }
-        .btn-secondary { background:rgba(59,130,246,0.12); border:1px solid rgba(59,130,246,0.3); color:#60a5fa; padding:6px 14px; border-radius:6px; font-size:12px; cursor:pointer; transition:all .2s; }
-        .btn-secondary:hover { background:rgba(59,130,246,0.22); }
+        /* Botones estilo Puzzle */
+        .btn-primary {
+            background: linear-gradient(180deg, #42f2ab 0%, #28d790 100%);
+            color: #071911;
+            padding: 9px 18px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 13px;
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            cursor: pointer;
+            transition: all .2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.45),
+                0 4px 18px rgba(52, 229, 158, 0.26);
+        }
+        .btn-primary:hover {
+            background: linear-gradient(180deg, #58f7b6 0%, #34e59e 100%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.55),
+                0 0 24px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
 
-        /* Table */
-        .data-table { width:100%; border-collapse:collapse; font-size:13px; }
-        .data-table thead tr { background:rgba(30,58,138,0.4); }
-        .data-table th { padding:12px 16px; text-align:left; font-weight:600; color:#93c5fd; text-transform:uppercase; font-size:11px; letter-spacing:.05em; border-bottom:1px solid var(--border); }
-        .data-table td { padding:11px 16px; border-bottom:1px solid rgba(255,255,255,0.04); color:#cbd5e1; }
-        .data-table tbody tr:hover { background:rgba(59,130,246,0.06); }
+        .btn-danger {
+            background: linear-gradient(180deg, rgba(244, 63, 94, 0.18) 0%, rgba(190, 18, 60, 0.14) 100%);
+            border: 1px solid rgba(251, 113, 133, 0.36);
+            color: #fda4af;
+            padding: 6px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all .2s ease;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+        }
+        .btn-danger:hover {
+            background: rgba(244, 63, 94, 0.26);
+            border-color: rgba(251, 113, 133, 0.55);
+            box-shadow: 0 0 16px rgba(244, 63, 94, 0.22);
+        }
 
-        /* Form inputs */
-        .form-input { background:rgba(15,23,42,0.8); border:1px solid rgba(99,179,237,0.2); border-radius:8px; padding:8px 12px; color:#e2e8f0; font-size:13px; width:100%; outline:none; transition:.2s; }
-        .form-input:focus { border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,0.15); }
-        .form-label { font-size:12px; font-weight:500; color:#94a3b8; margin-bottom:4px; display:block; }
+        .btn-warning {
+            background: linear-gradient(180deg, rgba(245, 196, 81, 0.16) 0%, rgba(202, 138, 4, 0.12) 100%);
+            border: 1px solid rgba(245, 196, 81, 0.38);
+            color: #fde047;
+            padding: 6px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all .2s ease;
+        }
+        .btn-warning:hover {
+            background: rgba(245, 196, 81, 0.24);
+            box-shadow: 0 0 16px rgba(245, 196, 81, 0.2);
+        }
 
-        /* Tabs */
-        .tab-btn { padding:8px 18px; border-radius:6px 6px 0 0; font-size:13px; font-weight:500; cursor:pointer; border:none; color:#64748b; background:transparent; transition:.2s; border-bottom:2px solid transparent; }
-        .tab-btn.active { color:#93c5fd; border-bottom:2px solid #3b82f6; }
-        .tab-content { display:none; }
-        .tab-content.active { display:block; }
+        .btn-success {
+            background: linear-gradient(180deg, rgba(52, 229, 158, 0.16) 0%, rgba(16, 185, 129, 0.10) 100%);
+            border: 1px solid rgba(52, 229, 158, 0.42);
+            color: #4ef2b0;
+            padding: 6px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all .2s ease;
+            box-shadow: 0 0 14px rgba(52, 229, 158, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .btn-success:hover {
+            background: rgba(52, 229, 158, 0.24);
+            box-shadow: 0 0 18px rgba(52, 229, 158, 0.24);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(180deg, rgba(34, 40, 62, 0.9) 0%, rgba(23, 27, 43, 0.9) 100%);
+            border: 1px solid rgba(86, 204, 242, 0.38);
+            color: #6dd5fa;
+            padding: 6px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all .2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            box-shadow: 0 0 14px rgba(86, 204, 242, 0.10), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        .btn-secondary:hover {
+            background: rgba(86, 204, 242, 0.16);
+            border-color: rgba(86, 204, 242, 0.6);
+            box-shadow: 0 0 18px rgba(86, 204, 242, 0.24);
+        }
+
+        /* Tablas estilo Puzzle */
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .data-table thead tr {
+            background: rgba(15, 17, 28, 0.72);
+            border-bottom: 1px solid var(--border);
+        }
+        .data-table th {
+            padding: 13px 16px;
+            text-align: left;
+            font-weight: 600;
+            color: #8f96b3;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: .06em;
+            border-bottom: 1px solid var(--border);
+        }
+        .data-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+            color: #d5dceb;
+        }
+        .data-table tbody tr { transition: background .15s ease; }
+        .data-table tbody tr:hover { background: rgba(255, 255, 255, 0.035); }
+
+        /* Inputs estilo Puzzle ("About Your Company" / "Format .CSV") */
+        .form-input {
+            background: var(--bg-input);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 10px;
+            padding: 8.5px 12px;
+            color: #eef1f8;
+            font-size: 13px;
+            width: 100%;
+            outline: none;
+            transition: all .2s ease;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.45), 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+        .form-input::placeholder { color: #5e6582; }
+        .form-input:focus {
+            border-color: rgba(52, 229, 158, 0.55);
+            box-shadow: 0 0 0 3px rgba(52, 229, 158, 0.14), inset 0 2px 4px rgba(0, 0, 0, 0.45);
+        }
+        .form-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #949cb8;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        /* Segmented Pill Tabs estilo Puzzle ("All Team Members | Accounting/Finance | Tech") */
+        .puzzle-tabs {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding: 5px;
+            background: #121420;
+            border: 1px solid rgba(255, 255, 255, 0.085);
+            border-radius: 14px;
+            box-shadow:
+                inset 0 2px 5px rgba(0, 0, 0, 0.55),
+                0 0 0 3px rgba(9, 10, 17, 0.75);
+        }
+        .tab-btn {
+            padding: 8px 20px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            border: 1px solid transparent;
+            color: #8e96b2;
+            background: transparent;
+            transition: all .2s ease;
+        }
+        .tab-btn:hover { color: #dbe2f4; }
+        .tab-btn.active {
+            color: #ffffff;
+            font-weight: 600;
+            background: linear-gradient(180deg, #272b42 0%, #1c1f32 100%);
+            border: 1px solid rgba(185, 195, 255, 0.22);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.16),
+                0 0 18px rgba(139, 124, 246, 0.34),
+                0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
 
         /* Progress bar */
-        #progress-bar { display:none; }
-        #progress-bar.visible { display:flex; }
+        #progress-bar { display: none; }
+        #progress-bar.visible { display: flex; }
 
-        /* Badge */
-        .badge-late  { background:rgba(239,68,68,0.15); color:#f87171; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
-        .badge-ok    { background:rgba(34,197,94,0.15);  color:#4ade80; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
-        .badge-dept  { background:rgba(99,179,237,0.1);  color:#7dd3fc; padding:2px 8px; border-radius:12px; font-size:11px; }
+        /* Badges estilo Puzzle ("↓ 1 mo" / "Tech & Accounting") */
+        .badge-late {
+            background: rgba(244, 63, 94, 0.18);
+            border: 1px solid rgba(251, 113, 133, 0.34);
+            color: #fb7185;
+            padding: 3px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-ok {
+            background: rgba(52, 229, 158, 0.15);
+            border: 1px solid rgba(52, 229, 158, 0.34);
+            color: #36e89e;
+            padding: 3px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge-dept {
+            background: rgba(86, 204, 242, 0.10);
+            border: 1px solid rgba(86, 204, 242, 0.28);
+            color: #7dd3fc;
+            padding: 3px 10px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 500;
+        }
 
         /* Scrollbar */
-        ::-webkit-scrollbar { width:5px; height:5px; }
-        ::-webkit-scrollbar-track { background:transparent; }
-        ::-webkit-scrollbar-thumb { background:#334155; border-radius:4px; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #2b3048; border-radius: 4px; }
 
-        /* Checkbox listado */
-        .emp-checkbox { accent-color:#3b82f6; width:15px; height:15px; cursor:pointer; }
+        /* Checkbox listado con verde menta Puzzle */
+        .emp-checkbox { accent-color: var(--accent); width: 15px; height: 15px; cursor: pointer; }
 
         /* Toast */
-        #toast { position:fixed; bottom:24px; right:24px; z-index:9999; display:none; }
-        #toast.visible { display:block; }
-        .toast-inner { padding:12px 20px; border-radius:10px; font-size:13px; font-weight:500; animation:slideUp .3s ease; }
+        #toast { position: fixed; bottom: 24px; right: 24px; z-index: 9999; display: none; }
+        #toast.visible { display: block; }
+        .toast-inner { padding: 13px 20px; border-radius: 12px; font-size: 13px; font-weight: 500; animation: slideUp .3s ease; }
         @keyframes slideUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
 
         /* Scrollbar visible para tablas con scroll */
-        .custom-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
-        .custom-scroll::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); border-radius: 6px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #3b82f6; border-radius: 6px; border: 2px solid rgba(15, 23, 42, 0.6); }
-        .custom-scroll::-webkit-scrollbar-thumb:hover { background: #60a5fa; }
-        .custom-scroll { scrollbar-width: thin; scrollbar-color: #3b82f6 rgba(15, 23, 42, 0.6); }
+        .custom-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+        .custom-scroll::-webkit-scrollbar-track { background: rgba(14, 16, 27, 0.65); border-radius: 6px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #2f3550; border-radius: 6px; border: 2px solid rgba(14, 16, 27, 0.65); }
+        .custom-scroll::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+        .custom-scroll { scrollbar-width: thin; scrollbar-color: #2f3550 rgba(14, 16, 27, 0.65); }
+
+        /* Pie de autor destacado (como en la segunda foto) */
+        .pie-autor {
+            margin-top: 36px;
+            padding: 26px 16px 28px;
+            background: #0a0d18;
+            border-top: 1px solid #26324d;
+            border-radius: 16px;
+            text-align: center;
+            font-size: 14px;
+            color: #8597B9;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+        .pie-autor p + p { margin-top: 5px; }
+        .pie-autor .pie-titulo {
+            font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: #EEF3FB;
+            letter-spacing: -0.01em;
+        }
+        .pie-autor strong {
+            color: #FFFFFF;
+            font-weight: 700;
+            font-size: 15px;
+        }
+        .pie-autor a {
+            color: #FFE066;
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+        .pie-autor a:hover {
+            color: #34e59e;
+        }
 
         @media (max-width:768px) {
             #sidebar { display:none; }
@@ -118,11 +429,13 @@
 <body class="flex">
 
 <!-- LOGIN -->
-<div id="login-screen" class="fixed inset-0 z-50 flex items-center justify-center" style="background: radial-gradient(ellipse at 20% 20%, rgba(30,64,175,0.25) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(124,58,237,0.15) 0%, transparent 60%), #0b1120;">
+<div id="login-screen" class="fixed inset-0 z-50 flex flex-col items-center justify-center p-4" style="background: radial-gradient(ellipse 65% 50% at 20% 15%, rgba(139, 124, 246, 0.14) 0%, transparent 60%), radial-gradient(ellipse 55% 45% at 80% 85%, rgba(52, 229, 158, 0.10) 0%, transparent 60%), #0d0f18;">
     <div class="glass p-8 w-full max-w-sm space-y-6">
         <div class="text-center">
             <div class="flex justify-center mb-4">
-                <img src="logo.png" class="h-16 w-auto" alt="Logo REDIHOS">
+                <div class="p-3 rounded-2xl bg-[#131625] border border-white/10 shadow-inner">
+                    <img src="logo.png" class="h-14 w-auto" alt="Logo REDIHOS">
+                </div>
             </div>
             <h1 class="text-xl font-bold text-white">Sistema de Asistencia</h1>
             <p class="text-xs text-slate-400 mt-1">REDIHOS S.A.S.</p>
@@ -136,14 +449,20 @@
                 <label class="form-label">Contraseña</label>
                 <input type="password" id="login-password" class="form-input" placeholder="••••••" onkeydown="if(event.key==='Enter') login()">
             </div>
-            <p id="login-error" class="text-xs text-red-400 hidden"></p>
+            <p id="login-error" class="text-xs text-rose-400 hidden"></p>
             <button onclick="login()" class="btn-primary w-full justify-center py-2.5">Ingresar</button>
         </div>
+    </div>
+    <div class="mt-8 text-center">
+        <p class="text-sm font-bold text-[#EEF3FB]">Sistema Biométrico v3.0</p>
+        <p class="text-xs text-[#8597B9] mt-1">
+            Diseñado por <strong class="text-white font-bold text-sm">Bairon Calle Rivera</strong> — <a href="mailto:b41r0nn@gmail.com" class="text-[#FFE066] font-semibold underline underline-offset-4 hover:text-[#34e59e]">b41r0nn@gmail.com</a>
+        </p>
     </div>
 </div>
 
 <!-- CAMBIO DE CONTRASEÑA OBLIGATORIO -->
-<div id="password-change-screen" class="fixed inset-0 z-50 flex items-center justify-center hidden" style="background: radial-gradient(ellipse at 20% 20%, rgba(30,64,175,0.25) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(124,58,237,0.15) 0%, transparent 60%), #0b1120;">
+<div id="password-change-screen" class="fixed inset-0 z-50 flex items-center justify-center hidden" style="background: radial-gradient(ellipse 65% 50% at 20% 15%, rgba(139, 124, 246, 0.14) 0%, transparent 60%), radial-gradient(ellipse 55% 45% at 80% 85%, rgba(52, 229, 158, 0.10) 0%, transparent 60%), #0d0f18;">
     <div class="glass p-8 w-full max-w-sm space-y-6">
         <div class="text-center">
             <h1 class="text-xl font-bold text-white">Cambio de contraseña</h1>
@@ -162,7 +481,7 @@
                 <label class="form-label">Confirmar nueva contraseña</label>
                 <input type="password" id="pw-confirmar" class="form-input" placeholder="••••••" onkeydown="if(event.key==='Enter') cambiarPassword()">
             </div>
-            <p id="pw-change-error" class="text-xs text-red-400 hidden"></p>
+            <p id="pw-change-error" class="text-xs text-rose-400 hidden"></p>
             <button onclick="cambiarPassword()" class="btn-primary w-full justify-center py-2.5">Actualizar contraseña</button>
         </div>
     </div>
@@ -170,14 +489,14 @@
 
 <!-- SIDEBAR -->
 <nav id="sidebar" class="flex flex-col p-4 pt-6 flex-shrink-0">
-    <div class="mb-8 px-2">
-        <div class="mb-2">
-            <img src="logo.png" class="h-14 w-auto" alt="Logo REDIHOS">
+    <div class="mb-7 px-3 py-3 rounded-2xl bg-[#121524] border border-white/[0.07] shadow-inner">
+        <div class="mb-2.5">
+            <img src="logo.png" class="h-12 w-auto" alt="Logo REDIHOS">
         </div>
         <h1 class="text-base font-bold text-white leading-tight">Sistema de Asistencia</h1>
-        <p class="text-xs text-slate-500 mt-0.5">REDIHOS S.A.S.</p>
+        <p class="text-xs text-slate-400 mt-0.5">REDIHOS S.A.S.</p>
     </div>
-    <div class="flex-1 space-y-1">
+    <div class="flex-1 space-y-1.5">
         <div class="nav-item active" onclick="showView('dashboard')" id="nav-dashboard">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7h18M3 12h18M3 17h18"/></svg>
             Dashboard
@@ -195,24 +514,30 @@
             Administración
         </div>
     </div>
-    <div class="mt-auto pt-4 border-t border-slate-800 px-2 space-y-2">
-        <div class="text-xs text-slate-400 truncate" id="user-info">—</div>
-        <button onclick="logout()" class="w-full text-left text-xs text-slate-500 hover:text-slate-300">Cerrar sesión</button>
-        <p class="text-xs text-slate-600">Sistema Biométrico v3.0</p>
-        <p class="text-[10px] text-slate-700 leading-tight">
-            Diseñado por Bairon Calle Rivera — b41r0nn@gmail.com
-        </p>
+    <div class="mt-auto pt-4 border-t border-white/10 px-2 space-y-2.5">
+        <div class="flex items-center gap-2 px-2.5 py-2 rounded-xl bg-[#111320] border border-white/[0.07]">
+            <span class="w-2 h-2 rounded-full bg-[#34e59e] shadow-[0_0_8px_#34e59e] flex-shrink-0"></span>
+            <div class="text-xs font-medium text-slate-200 truncate" id="user-info">—</div>
+        </div>
+        <button onclick="logout()" class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors">Cerrar sesión</button>
+        <div class="pt-2 border-t border-white/[0.06] px-1 space-y-1">
+            <p class="text-xs font-bold text-[#EEF3FB]">Sistema Biométrico v3.0</p>
+            <p class="text-xs text-[#8597B9] leading-snug">
+                Diseñado por <strong class="text-white font-bold">Bairon Calle Rivera</strong><br>
+                <a href="mailto:b41r0nn@gmail.com" class="text-[#FFE066] font-semibold underline underline-offset-2 hover:text-[#34e59e]">b41r0nn@gmail.com</a>
+            </p>
+        </div>
     </div>
 </nav>
 
 <!-- MAIN CONTENT -->
-<main class="flex-1 overflow-auto p-6 space-y-6 min-h-screen">
+<main class="flex-1 overflow-auto p-6 space-y-6 min-h-screen flex flex-col">
 
     <!-- ── BARRA DE PROGRESO ────────────────────────────────────────────────── -->
-    <div id="progress-bar" class="glass p-4 flex items-center gap-4 border-sky-500/30 bg-sky-900/10">
-        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-sky-400"></div>
+    <div id="progress-bar" class="glass p-4 flex items-center gap-4 border-[#34e59e]/30">
+        <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-[#34e59e]"></div>
         <div>
-            <p class="text-xs font-semibold text-sky-400 uppercase tracking-wider">Extracción en curso</p>
+            <p class="text-xs font-semibold text-[#34e59e] uppercase tracking-wider">Extracción en curso</p>
             <p id="progress-msg" class="text-xs text-slate-300 font-mono mt-0.5">Conectando...</p>
         </div>
     </div>
@@ -220,7 +545,7 @@
     <!-- ══════════════════════════════════════════════════════════════════════ -->
     <!-- VISTA: DASHBOARD                                                       -->
     <!-- ══════════════════════════════════════════════════════════════════════ -->
-    <div id="view-dashboard">
+    <div id="view-dashboard" class="flex-1">
         <!-- Aviso de extracción atrasada -->
         <div id="extraccion-alerta" class="hidden glass p-4 mb-4 border border-red-500/30 bg-red-900/20 text-sm"></div>
 
@@ -233,7 +558,7 @@
                 <h2 class="text-2xl font-bold text-white">Dashboard</h2>
                 <p class="text-slate-400 text-sm mt-0.5">Resumen del día seleccionado</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex flex-wrap items-center gap-3">
                 <input type="date" id="kpi-date" class="form-input w-40"
                        onchange="cargarDashboard()">
                 <div class="flex items-center gap-2">
@@ -254,27 +579,27 @@
             <div class="kpi-card">
                 <p class="text-xs text-slate-400 uppercase tracking-wider mb-2">Total Marcaciones</p>
                 <div class="kpi-value kpi-blue" id="kpi-total">—</div>
-                <p class="text-xs text-slate-500 mt-1">del día</p>
+                <p class="text-xs text-slate-500 mt-1.5">del día</p>
             </div>
             <div class="kpi-card">
                 <p class="text-xs text-slate-400 uppercase tracking-wider mb-2">Con Registro</p>
                 <div class="kpi-value kpi-ok" id="kpi-presentes">—</div>
-                <p class="text-xs text-slate-500 mt-1">empleados</p>
+                <p class="text-xs text-slate-500 mt-1.5">empleados</p>
             </div>
             <div class="kpi-card">
                 <p class="text-xs text-slate-400 uppercase tracking-wider mb-2">Llegadas Tarde</p>
                 <div class="kpi-value kpi-late" id="kpi-tardanzas">—</div>
-                <p class="text-xs text-slate-500 mt-1">empleados</p>
+                <p class="text-xs text-slate-500 mt-1.5">empleados</p>
             </div>
             <div class="kpi-card">
                 <p class="text-xs text-slate-400 uppercase tracking-wider mb-2">% Asistencia a Tiempo</p>
                 <div class="kpi-value kpi-ok" id="kpi-tiempo-pct">—</div>
-                <p class="text-xs text-slate-500 mt-1" id="kpi-tiempo-sub">—</p>
+                <p class="text-xs text-slate-500 mt-1.5" id="kpi-tiempo-sub">—</p>
             </div>
             <div class="kpi-card">
                 <p class="text-xs text-slate-400 uppercase tracking-wider mb-2">Minutos Perdidos</p>
                 <div class="kpi-value kpi-late" id="kpi-minutos-perdidos">—</div>
-                <p class="text-xs text-slate-500 mt-1">por tardanza</p>
+                <p class="text-xs text-slate-500 mt-1.5">por tardanza</p>
             </div>
         </div>
 
@@ -282,12 +607,12 @@
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
             <!-- Llegadas tarde -->
             <div class="glass p-0 overflow-hidden flex flex-col h-[55vh]">
-                <div class="px-6 py-4 border-b border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="px-6 py-4 border-b border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                         <h3 class="font-semibold text-white text-sm">Llegadas Tarde Hoy</h3>
                         <span class="text-xs text-slate-500" id="tardanzas-count"></span>
                     </div>
-                    <button onclick="exportarTardanzasExcel()" class="btn-secondary text-xs py-1.5 px-2" title="Exportar a Excel">
+                    <button onclick="exportarTardanzasExcel()" class="btn-secondary text-xs py-1.5 px-2.5" title="Exportar a Excel">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                     </button>
                 </div>
@@ -309,7 +634,7 @@
 
             <!-- Marcas del día -->
             <div class="glass p-0 overflow-hidden flex flex-col h-[55vh]">
-                <div class="px-6 py-4 border-b border-slate-700/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="px-6 py-4 border-b border-white/[0.08] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <h3 class="font-semibold text-white text-sm">Marcas del Día</h3>
                     <div class="flex items-center gap-2">
                         <input type="text" id="search-marcas" placeholder="Buscar empleado..."
@@ -337,7 +662,7 @@
     <!-- ══════════════════════════════════════════════════════════════════════ -->
     <!-- VISTA: MARCAS DEL DÍA                                                  -->
     <!-- ══════════════════════════════════════════════════════════════════════ -->
-    <div id="view-marcas" class="hidden space-y-6">
+    <div id="view-marcas" class="hidden space-y-6 flex-1">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-2">
             <div>
                 <h2 class="text-2xl font-bold text-white">Marcas del día</h2>
@@ -349,7 +674,7 @@
             </div>
         </div>
         <div class="glass p-0 overflow-hidden">
-            <div class="overflow-auto max-h-[70vh]">
+            <div class="overflow-auto max-h-[70vh] custom-scroll">
                 <table class="data-table">
                     <thead><tr>
                         <th>Empleado</th>
@@ -367,14 +692,14 @@
     <!-- ══════════════════════════════════════════════════════════════════════ -->
     <!-- VISTA: REPORTES                                                        -->
     <!-- ══════════════════════════════════════════════════════════════════════ -->
-    <div id="view-reportes" class="hidden space-y-6">
+    <div id="view-reportes" class="hidden space-y-6 flex-1">
         <div class="mb-2">
             <h2 class="text-2xl font-bold text-white">Reportes</h2>
             <p class="text-slate-400 text-sm mt-0.5">Genera informes y consulta el histórico de llegadas tarde</p>
         </div>
 
         <!-- Tabs de reportes -->
-        <div class="border-b border-slate-700">
+        <div class="puzzle-tabs">
             <button class="tab-btn active" onclick="showReportTab('generar')" id="tab-btn-generar">Generar Reporte</button>
             <button class="tab-btn"        onclick="showReportTab('historico')" id="tab-btn-historico">Histórico de Llegadas Tarde</button>
         </div>
@@ -419,7 +744,7 @@
                     </div>
                     <input type="text" id="search-emp" placeholder="Buscar empleado..."
                            class="form-input mb-2" oninput="filtrarListaEmpleados()">
-                    <div id="emp-list" class="border border-slate-700/50 rounded-lg overflow-auto max-h-52 divide-y divide-slate-800/50 bg-slate-900/30"></div>
+                    <div id="emp-list" class="border border-white/[0.08] rounded-xl overflow-auto max-h-52 divide-y divide-white/[0.05] bg-[#111320] custom-scroll"></div>
                 </div>
 
                 <button onclick="generarReporte()" class="btn-primary w-full justify-center py-3 text-sm" id="btn-generar">
@@ -447,7 +772,7 @@
                         </button>
                     </div>
                 </div>
-                <div class="overflow-auto">
+                <div class="overflow-auto custom-scroll">
                     <table class="data-table">
                         <thead><tr>
                             <th>Empleado</th>
@@ -469,14 +794,14 @@
     <!-- ══════════════════════════════════════════════════════════════════════ -->
     <!-- VISTA: ADMINISTRACIÓN                                                  -->
     <!-- ══════════════════════════════════════════════════════════════════════ -->
-    <div id="view-admin" class="hidden space-y-6">
+    <div id="view-admin" class="hidden space-y-6 flex-1">
         <div class="mb-2">
             <h2 class="text-2xl font-bold text-white">Administración</h2>
             <p class="text-slate-400 text-sm mt-0.5">Gestiona empleados, turnos, festivos y correo</p>
         </div>
 
         <!-- Tabs -->
-        <div class="border-b border-slate-700">
+        <div class="puzzle-tabs">
             <button class="tab-btn active" onclick="showTab('empleados')">Empleados</button>
             <button class="tab-btn"        onclick="showTab('turnos')">Turnos</button>
             <button class="tab-btn"        onclick="showTab('festivos')">Festivos</button>
@@ -486,10 +811,10 @@
 
         <!-- TAB: Empleados -->
         <div id="tab-empleados" class="tab-content active space-y-4">
-            <div class="glass p-4 space-y-3">
+            <div class="glass p-5 space-y-3">
                 <div class="flex items-center justify-between flex-wrap gap-3">
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-300">Empleados sincronizados</h3>
+                        <h3 class="text-sm font-semibold text-white">Empleados sincronizados</h3>
                         <p class="text-xs text-slate-400">Los empleados se obtienen automáticamente desde el biométrico. Edita departamento y asigna un turno (el horario se lee desde la versión vigente del turno).</p>
                     </div>
                     <div class="flex items-center gap-3">
@@ -516,13 +841,13 @@
             </div>
 
             <!-- Marcas sin asociar -->
-            <div class="glass p-4 mt-6">
+            <div class="glass p-5 mt-6">
                 <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-sm font-semibold text-orange-400">Marcas sin Empleado Asociado</h3>
-                    <button onclick="cargarMarcasSinAsociar()" class="text-xs text-sky-400 hover:text-sky-300">↻ Actualizar</button>
+                    <h3 class="text-sm font-semibold text-amber-400">Marcas sin Empleado Asociado</h3>
+                    <button onclick="cargarMarcasSinAsociar()" class="text-xs text-[#34e59e] hover:text-[#6dd5fa]">↻ Actualizar</button>
                 </div>
                 <p class="text-xs text-slate-400 mb-4">Estas marcas provienen del biométrico pero el nombre aún no coincide con ningún Empleado sincronizado. Si el empleado existe en el dispositivo, pulsa "Sincronizar con dispositivo".</p>
-                <div class="overflow-auto max-h-48">
+                <div class="overflow-auto max-h-48 custom-scroll">
                     <table class="data-table">
                         <thead><tr><th>Nombre en Biométrico</th><th>ID en Biométrico</th></tr></thead>
                         <tbody id="tabla-sin-asociar"><tr><td colspan="2" class="text-center py-4 text-slate-500 text-xs">Cargando...</td></tr></tbody>
@@ -533,10 +858,10 @@
 
         <!-- TAB: Turnos -->
         <div id="tab-turnos" class="tab-content space-y-4">
-            <div class="glass p-4 space-y-3">
+            <div class="glass p-5 space-y-3">
                 <div class="flex items-center justify-between flex-wrap gap-3">
                     <div>
-                        <h3 class="text-sm font-semibold text-slate-300">Turnos</h3>
+                        <h3 class="text-sm font-semibold text-white">Turnos</h3>
                         <p class="text-xs text-slate-400">Cada turno tiene 5 horarios versionados (lunes a viernes). Al guardar un cambio se crea una nueva vigencia; el historial se conserva.</p>
                     </div>
                     <button onclick="mostrarFormTurno()" class="btn-primary text-xs px-3 py-2">+ Nuevo turno</button>
@@ -544,8 +869,8 @@
             </div>
 
             <!-- Formulario nuevo/editar turno -->
-            <div id="form-turno" class="glass p-4 space-y-4 hidden">
-                <h4 id="titulo-form-turno" class="text-sm font-semibold text-slate-300">Nuevo turno</h4>
+            <div id="form-turno" class="glass p-5 space-y-4 hidden">
+                <h4 id="titulo-form-turno" class="text-sm font-semibold text-white">Nuevo turno</h4>
                 <input type="hidden" id="turno-id">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -569,8 +894,8 @@
             </div>
 
             <!-- Formulario nueva vigencia de un día -->
-            <div id="form-vigencia" class="glass p-4 space-y-4 hidden">
-                <h4 class="text-sm font-semibold text-slate-300">Nueva vigencia de horario</h4>
+            <div id="form-vigencia" class="glass p-5 space-y-4 hidden">
+                <h4 class="text-sm font-semibold text-white">Nueva vigencia de horario</h4>
                 <input type="hidden" id="vigencia-turno-id">
                 <input type="hidden" id="vigencia-dia-semana">
                 <p class="text-xs text-slate-400">Día: <span id="vigencia-dia-nombre" class="text-white font-medium"></span></p>
@@ -614,8 +939,8 @@
         <!-- TAB: Festivos (solo lectura) -->
         <div id="tab-festivos" class="tab-content space-y-4">
             <div class="glass p-5 space-y-3">
-                <h3 class="text-sm font-semibold text-slate-300">Festivos cargados automáticamente</h3>
-                <p class="text-xs text-slate-400">Los festivos colombianos se obtienen de la librería <code class="text-sky-400">holidays</code> y se actualizan automáticamente al iniciar el sistema. No requieren administración manual.</p>
+                <h3 class="text-sm font-semibold text-white">Festivos cargados automáticamente</h3>
+                <p class="text-xs text-slate-400">Los festivos colombianos se obtienen de la librería <code class="text-[#56ccf2]">holidays</code> y se actualizan automáticamente al iniciar el sistema. No requieren administración manual.</p>
             </div>
             <div class="glass overflow-hidden">
                 <table class="data-table">
@@ -628,7 +953,7 @@
         <!-- TAB: Correo -->
         <div id="tab-correo" class="tab-content space-y-4">
             <div class="glass p-5 space-y-4">
-                <h3 class="text-sm font-semibold text-slate-300">Configuración de correo SMTP</h3>
+                <h3 class="text-sm font-semibold text-white">Configuración de correo SMTP</h3>
                 <p class="text-xs text-slate-400">La contraseña se guarda encriptada en la base de datos. Dejar el campo en blanco para no cambiarla.</p>
 
                 <form id="form-correo" class="space-y-3">
@@ -673,8 +998,8 @@
                     </div>
                 </form>
 
-                <div class="pt-3 border-t border-slate-700/50 space-y-3">
-                    <h4 class="text-xs font-semibold text-slate-300">Correo de prueba</h4>
+                <div class="pt-3 border-t border-white/[0.08] space-y-3">
+                    <h4 class="text-xs font-semibold text-white">Correo de prueba</h4>
                     <div class="flex gap-2">
                         <input type="email" id="cfg-test-dest" class="form-input text-xs" placeholder="correo@redihos.com">
                         <button onclick="probarCorreoConfig()" class="btn-primary text-xs px-3">
@@ -686,7 +1011,7 @@
                 </div>
 
                 <!-- Destinatarios -->
-                <div class="pt-3 border-t border-slate-700/50 space-y-2">
+                <div class="pt-3 border-t border-white/[0.08] space-y-2">
                     <label class="form-label">Destinatarios de reportes automáticos</label>
                     <div class="flex gap-2">
                         <input type="email" id="new-dest-email" class="form-input text-xs" placeholder="correo@redihos.com">
@@ -696,11 +1021,11 @@
                 </div>
 
                 <!-- Periodicidad -->
-                <div class="space-y-3 pt-2 border-t border-slate-700/50">
-                    <h4 class="text-xs font-semibold text-slate-300">Programación de reportes</h4>
+                <div class="space-y-3 pt-2 border-t border-white/[0.08]">
+                    <h4 class="text-xs font-semibold text-white">Programación de reportes</h4>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-2">
-                            <p class="text-xs font-semibold text-slate-300">📅 Reporte Semanal</p>
+                        <div class="p-3.5 rounded-xl bg-[#111320] border border-white/[0.08] space-y-2">
+                            <p class="text-xs font-semibold text-slate-200">📅 Reporte Semanal</p>
                             <div class="grid grid-cols-2 gap-2">
                                 <select id="sem-dia" class="form-input text-xs py-1">
                                     <option value="1">Lunes</option>
@@ -714,8 +1039,8 @@
                                 <input type="time" id="sem-hora" class="form-input text-xs py-1">
                             </div>
                         </div>
-                        <div class="p-3 rounded-lg bg-slate-900/50 border border-slate-700 space-y-2">
-                            <p class="text-xs font-semibold text-slate-300">📊 Reporte Mensual</p>
+                        <div class="p-3.5 rounded-xl bg-[#111320] border border-white/[0.08] space-y-2">
+                            <p class="text-xs font-semibold text-slate-200">📊 Reporte Mensual</p>
                             <div class="grid grid-cols-2 gap-2">
                                 <input type="number" id="men-dia" class="form-input text-xs py-1" min="1" max="31" placeholder="Día">
                                 <input type="time" id="men-hora" class="form-input text-xs py-1">
@@ -736,15 +1061,15 @@
         <div id="tab-roles" class="tab-content space-y-4">
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 <!-- Usuarios -->
-                <div class="glass p-4 space-y-3">
-                    <h3 class="text-sm font-semibold text-slate-300">Usuarios</h3>
+                <div class="glass p-5 space-y-3">
+                    <h3 class="text-sm font-semibold text-white">Usuarios</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                         <input type="text" id="new-user-username" class="form-input text-xs" placeholder="Nuevo usuario">
                         <input type="password" id="new-user-password" class="form-input text-xs" placeholder="Contraseña">
                         <select id="new-user-rol" class="form-input text-xs"></select>
                         <button onclick="crearUsuario()" class="btn-primary text-xs">Crear usuario</button>
                     </div>
-                    <div class="overflow-auto max-h-60">
+                    <div class="overflow-auto max-h-60 custom-scroll">
                         <table class="data-table">
                             <thead><tr><th>Usuario</th><th>Rol</th><th>Activo</th><th></th></tr></thead>
                             <tbody id="tabla-usuarios"><tr><td colspan="4" class="text-center py-4 text-slate-500 text-xs">Cargando...</td></tr></tbody>
@@ -753,13 +1078,13 @@
                 </div>
 
                 <!-- Roles y permisos -->
-                <div class="glass p-4 space-y-3">
-                    <h3 class="text-sm font-semibold text-slate-300">Roles y permisos</h3>
+                <div class="glass p-5 space-y-3">
+                    <h3 class="text-sm font-semibold text-white">Roles y permisos</h3>
                     <div class="flex gap-2">
                         <input type="text" id="new-rol-nombre" class="form-input text-xs" placeholder="Nuevo rol">
                         <button onclick="crearRol()" class="btn-primary text-xs">Crear rol</button>
                     </div>
-                    <div class="overflow-auto max-h-60">
+                    <div class="overflow-auto max-h-60 custom-scroll">
                         <table class="data-table">
                             <thead><tr><th>Rol</th><th>Permisos</th><th></th></tr></thead>
                             <tbody id="tabla-roles"><tr><td colspan="3" class="text-center py-4 text-slate-500 text-xs">Cargando...</td></tr></tbody>
@@ -771,15 +1096,21 @@
 
     </div><!-- /admin -->
 
+    <!-- PIE DE AUTOR (como en la segunda foto) -->
+    <footer class="pie-autor">
+        <p class="pie-titulo">Sistema Biométrico v3.0</p>
+        <p>Diseñado por <strong>Bairon Calle Rivera</strong> — <a href="mailto:b41r0nn@gmail.com">b41r0nn@gmail.com</a></p>
+    </footer>
+
 </main>
 
 <!-- MODAL: contraseña temporal -->
-<div id="modal-reset-password" class="hidden fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-    <div class="bg-slate-800 p-6 rounded-lg shadow-lg max-w-md w-full border border-slate-600">
+<div id="modal-reset-password" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50">
+    <div class="glass p-6 max-w-md w-full">
         <h3 class="text-lg font-semibold text-white mb-2">Contraseña temporal</h3>
         <p class="text-sm text-slate-300 mb-4">Copia esta contraseña ahora. No se podrá volver a consultar.</p>
         <input id="reset-password-temp" type="text" readonly
-               class="w-full bg-slate-900 text-white border border-slate-600 rounded px-3 py-2 mb-4 font-mono">
+               class="form-input mb-4 font-mono">
         <div class="flex gap-2 justify-end">
             <button onclick="copiarPasswordTemporal()" class="btn-primary text-sm">Copiar</button>
             <button onclick="cerrarModalResetPassword()" class="btn-secondary text-sm">Cerrar</button>

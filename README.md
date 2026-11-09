@@ -77,7 +77,7 @@ roles, permisos y configuración de correo desde una interfaz web.
 │   ├── sync_empleados.py           # Sincronización de empleados desde el biométrico
 │   └── timezone.py                 # Helpers de zona horaria Bogotá
 ├── frontend/
-│   ├── index.html                  # UI del panel
+│   ├── index.html                  # UI del panel (estética oscura estilo Puzzle UI/UX + firma de autor destacada)
 │   ├── app.js                      # Lógica del frontend (usa /api relativo para HTTPS)
 │   ├── logo.png                    # Logo REDIHOS (login y sidebar)
 │   ├── favicon.svg                 # Favicon vectorial (navegadores modernos)
@@ -906,6 +906,7 @@ cp backups/.env.backup .env
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|---------------------|
+| `v1.6.1-ui-puzzle` | 2026-11-09 | Rediseño cosmético de UI/UX en `frontend/index.html` y `frontend/app.js` con estética oscura estilo Puzzle (tarjetas de doble bisel `#0d0f18`/`#141726`, botones primarios verde menta `#34e59e`, acentos cian `#56ccf2` y ámbar/coral, barra de pestañas segmentada `.puzzle-tabs`, inputs oscuros empotrados y navegación con indicador luminoso) y firma del autor destacada (`.pie-autor`) en login, sidebar y pie de página principal, manteniendo intactas todas las funcionalidades y textos |
 | `v1.6-security-fixes` | 2026-10-19 | Rate limiting (slowapi), HTTPS auto-signed + nginx proxy, CORS restrictivo, logging rotativo, refactor globales extractor, fix fusión de marcas (bug `hoy_bogota()`), índices de performance en BD, suite de 56 tests |
 | `v1.5` | 2026-09-29 | Correcciones varias, backup scripts |
 | `v1.0` | 2026-08-xx | Deploy inicial en producción Ubuntu |
