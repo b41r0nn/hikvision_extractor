@@ -835,3 +835,34 @@ Se aplicó una actualización exclusivamente cosmética sobre el frontend (`fron
 | 4.5 | Formularios, tablas y badges (`.form-input`, `.data-table`, `.badge-*`) | Campos de entrada empotrados (`#080a11`) con foco verde menta; tablas con cabeceras oscuras (`#0a0c14`) y divisores sutiles; insignias tipo píldora en verde menta, ámbar cálido (`#f5c451`), coral (`#fb7185`) y cian eléctrico (`#56ccf2`). |
 | 4.6 | Firma del autor destacada (`.pie-autor`) | Pie de página con mayor jerarquía visual y tamaño (estilo `pdf_tooloffice`) en la pantalla de login, pie del sidebar y pie de la vista principal: título `Sistema de Control de Asistencia Biométrica v3.0`, nombre del autor **`Bairon Calle Rivera`** en blanco y negrita destacada, y enlace `mailto:b41r0nn@gmail.com` en dorado cálido (`#fcd34d`) subrayado. |
 
+---
+
+## Fase 5: Legibilidad, firma discreta y denominación unificada (10 nov 2026)
+
+Entregada como `2bc936f` y desplegada en producción el mismo día. Es la primera
+entrega que **llega al servidor**: producción venía corriendo `66cb507`, es decir
+la versión *anterior* al rediseño Puzzle de la Fase 4, así que este despliegue
+publicó dos commits de cambio visual de una vez.
+
+| # | Componente | Detalle de los cambios |
+| --- | --- | --- |
+| 5.1 | Firma del autor (`.pie-autor`, login y sidebar) | Sustituye lo descrito en 4.6, que resultó demasiado ruidoso: el correo iba en amarillo `#FFE066` en negrita y subrayado, siendo el elemento más llamativo de la pantalla por encima de los propios datos de asistencia, y el pie era una tarjeta rellena `#0a0d18` con radio 16 px que pesaba igual que un panel de contenido. Ahora: sin relleno ni radio, solo filete superior al 7 %; texto `#7d87a3`, versión `#c6cee0`, nombre `#eef1f8` peso 600; correo sin color de acento, con filete inferior al 22 % que pasa a verde menta `#34e59e` solo al posar el cursor. Se elimina la raya espaciada que unía nombre y correo, y el `<br>` del sidebar: cada dato en su propia línea. Los tres tonos cumplen WCAG AA sobre el fondo (5.34:1, 12.11:1 y 16.91:1). |
+| 5.2 | Leyenda del logo | La leyenda «Su Distribuidor Hospitalario®» **no es texto HTML**: está incrustada dentro de `logo.png` (874×416, RGBA con transparencia), en negro cursiva bajo el óvalo azul. Sobre la placa oscura `#131625` resultaba ilegible, y no había ningún `color` que ajustar. Se corrigió cambiando el fondo, no el texto: el logo se apoya ahora en una placa clara `#eef1f8` —su contexto nativo— en login y sidebar, sin retocar el PNG ni aplicar filtros que habrían alterado el azul y el naranja corporativos. En el sidebar la placa rodea **solo la imagen** (`inline-block`), porque el contenedor exterior `#121524` alberga también los títulos en blanco. |
+| 5.3 | Denominación unificada | Convivían dos nombres: `Sistema Biométrico` (3 sitios en la interfaz) y `Sistema de Asistencia Biométrica` (9 sitios, entre ellos el título del README y el pie de los correos). Ambos pasan a **`Sistema de Control de Asistencia Biométrica`**: 13 ocurrencias en 7 archivos. No existía la denominación como nombre de variable, clase ni archivo, así que no hubo nada que renombrar en código; en `backend/` solo cambiaron literales de cadena y un docstring. Las ~77 menciones restantes de «biométrico» se refieren al **dispositivo** (`el biométrico`, `ID biométrico`, `DEVICE_IP`) y se dejaron intactas a propósito. |
+| 5.4 | Corrección de la receta de despliegue (`README.md` §9.5) | La sección decía «Reiniciar el frontend» con `up -d --force-recreate frontend`. **Esa receta no publica cambios de estáticos**: `frontend.Dockerfile` hace `COPY . /usr/share/nginx/html` y `docker-compose.prod.yml` no monta `./frontend` como volumen, así que recrear el contenedor vuelve a servir la imagen vieja. Reescrita para exigir `build frontend` y añadir la verificación por `sha1sum` del archivo servido. |
+
+**Verificación del despliegue.** El `sha1` del `index.html` servido por nginx
+(`881019ef…`) coincide byte a byte con el del commit `2bc936f`. Backend
+*healthy*; `POST /api/auth/login` con credenciales inválidas responde 401, lo que
+confirma la cadena nginx → backend → base de datos; assets y redirección
+HTTP→HTTPS correctos; sin errores en los logs. Respaldo de los archivos
+sustituidos en `~/hikvision_extractor/backups/pre_deploy_20261110_094448/`.
+
+Nota: `/api/health` devuelve 404 y **no es una regresión** — `/health` está
+montado fuera del prefijo `/api` (`backend/main.py:401`) y nginx solo proxea
+`/api/`.
+
+**Pendiente de esta fase.** El texto nuevo del pie de los correos semanal,
+mensual y de prueba no lo cubre la suite (56/56 en verde, pero ningún test
+afirma sobre el cuerpo de los correos). Solo se confirma enviando un correo real
+desde Administración → Correo.

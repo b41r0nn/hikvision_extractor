@@ -1,6 +1,6 @@
 # Sistema de Control de Asistencia Biométrica — REDIHOS S.A.S
 
-> **Versión actual:** `v1.6-security-fixes`
+> **Versión actual:** `v1.6.2-ui-legibilidad`
 
 Sistema de control de asistencia para **REPRESENTACIONES Y DISTRIBUCIONES
 HOSPITALARIAS S.A.S. (REDIHOS)**. Extrae marcaciones de un dispositivo
@@ -77,7 +77,7 @@ roles, permisos y configuración de correo desde una interfaz web.
 │   ├── sync_empleados.py           # Sincronización de empleados desde el biométrico
 │   └── timezone.py                 # Helpers de zona horaria Bogotá
 ├── frontend/
-│   ├── index.html                  # UI del panel (estética oscura estilo Puzzle UI/UX + firma de autor destacada)
+│   ├── index.html                  # UI del panel (estética oscura Puzzle; logo sobre placa clara y firma de autor discreta)
 │   ├── app.js                      # Lógica del frontend (usa /api relativo para HTTPS)
 │   ├── logo.png                    # Logo REDIHOS (login y sidebar)
 │   ├── favicon.svg                 # Favicon vectorial (navegadores modernos)
@@ -635,11 +635,29 @@ docker compose -f docker-compose.prod.yml build --no-cache backend
 docker compose -f docker-compose.prod.yml up -d backend
 ```
 
-### 9.5 Reiniciar el frontend
+### 9.5 Actualizar el frontend
+
+> **Importante:** el frontend **no usa bind mount**. `frontend.Dockerfile` hornea
+> los archivos estáticos dentro de la imagen con `COPY . /usr/share/nginx/html`,
+> y `docker-compose.prod.yml` no monta `./frontend` como volumen. Por eso, tras
+> cambiar `index.html`, `app.js`, `logo.png` o cualquier asset, **hay que
+> reconstruir la imagen**: recrear el contenedor vuelve a servir la versión
+> anterior.
 
 ```bash
-docker compose -f docker-compose.prod.yml up -d --force-recreate frontend
+docker compose -f docker-compose.prod.yml build frontend
+docker compose -f docker-compose.prod.yml up -d frontend
 ```
+
+Para confirmar que se está sirviendo la versión esperada, comparar el checksum
+del archivo servido con el del commit desplegado:
+
+```bash
+docker exec hikvision_frontend sha1sum /usr/share/nginx/html/index.html
+```
+
+Si solo se recrea el contenedor sin reconstruir (`up -d --force-recreate
+frontend`), **los cambios de estáticos no se publican**.
 
 ### 9.6 Deploy en producción (Ubuntu Server — guía completa)
 
@@ -906,6 +924,7 @@ cp backups/.env.backup .env
 
 | Versión | Fecha | Cambios principales |
 |---------|-------|---------------------|
+| `v1.6.2-ui-legibilidad` | 2026-11-10 | Firma de autor aligerada en login, sidebar y pie principal (se retira la tarjeta rellena y el correo en amarillo `#FFE066`; queda filete superior, texto atenuado `#7d87a3` y acento menta solo al pasar el cursor); leyenda «Su Distribuidor Hospitalario» del logo —incrustada en negro dentro de `logo.png`— ahora legible al apoyar el logo sobre placa clara `#eef1f8` en login y sidebar; denominación unificada a «Sistema de Control de Asistencia Biométrica» en 13 ocurrencias de 7 archivos, incluidos el título de este README y el pie de los correos semanal, mensual y de prueba SMTP. Sin cambios de lógica; suite 56/56 |
 | `v1.6.1-ui-puzzle` | 2026-11-09 | Rediseño cosmético de UI/UX en `frontend/index.html` y `frontend/app.js` con estética oscura estilo Puzzle (tarjetas de doble bisel `#0d0f18`/`#141726`, botones primarios verde menta `#34e59e`, acentos cian `#56ccf2` y ámbar/coral, barra de pestañas segmentada `.puzzle-tabs`, inputs oscuros empotrados y navegación con indicador luminoso) y firma del autor destacada (`.pie-autor`) en login, sidebar y pie de página principal, manteniendo intactas todas las funcionalidades y textos |
 | `v1.6-security-fixes` | 2026-10-19 | Rate limiting (slowapi), HTTPS auto-signed + nginx proxy, CORS restrictivo, logging rotativo, refactor globales extractor, fix fusión de marcas (bug `hoy_bogota()`), índices de performance en BD, suite de 56 tests |
 | `v1.5` | 2026-09-29 | Correcciones varias, backup scripts |
@@ -919,7 +938,10 @@ cp backups/.env.backup .env
    > Para eliminar la advertencia, instalar el cert en el almacén del SO o usar
    > un certificado de una CA privada interna.
 2. Verificar que el servidor SMTP esté configurado en el panel Admin y que los
-   reportes automáticos lleguen correctamente.
+   reportes automáticos lleguen correctamente. Desde `v1.6.2` el pie de los tres
+   correos (semanal, mensual y de prueba) dice «Sistema de Control de Asistencia
+   Biométrica»; ese texto no lo cubre la suite y solo se confirma enviando un
+   correo real desde Administración → Correo.
 3. Confirmar que todos los empleados activos tienen `turno_id` asignado (sin turno
    no se calculan tardanzas).
 
