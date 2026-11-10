@@ -1,6 +1,6 @@
 """
 backend/main.py
-API principal del Sistema de Asistencia Biométrica REDIHOS.
+API principal del Sistema de Control de Asistencia Biométrica REDIHOS.
 """
 import io
 import os

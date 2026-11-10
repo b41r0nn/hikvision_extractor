@@ -1,4 +1,4 @@
-# Sistema de Asistencia Biométrica — REDIHOS S.A.S
+# Sistema de Control de Asistencia Biométrica — REDIHOS S.A.S
 
 > **Versión actual:** `v1.6-security-fixes`
 

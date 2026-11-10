@@ -1,4 +1,4 @@
-# HANDOFF — Sistema de Asistencia Biométrica REDIHOS (Fase 3)
+# HANDOFF — Sistema de Control de Asistencia Biométrica REDIHOS (Fase 3)
 
 **Empresa:** REPRESENTACIONES Y DISTRIBUCIONES HOSPITALARIAS S.A.S (REDIHOS)  
 **Fase:** 3 — Servicio web con PostgreSQL, dashboard, reportes automáticos y panel de administración  
@@ -833,5 +833,5 @@ Se aplicó una actualización exclusivamente cosmética sobre el frontend (`fron
 | 4.3 | Botones y acciones (`.btn-*`) | Botón primario en verde menta sólido (`#34e59e` → `#1fd18a`) con texto oscuro `#05140d` en negrita y resplandor suave; botones secundarios oscuros con bisel e iluminado cian al pasar el cursor. |
 | 4.4 | Navegación y pestañas (`.nav-item`, `.puzzle-tabs`, `.tab-btn`) | Ítems del sidebar en formato píldora con punto indicador verde menta brillante (`box-shadow: 0 0 10px #34e59e`) en el estado activo; barras de pestañas en Reportes y Administración encapsuladas en contenedor `.puzzle-tabs` con pestaña activa elevada y halo luminoso. |
 | 4.5 | Formularios, tablas y badges (`.form-input`, `.data-table`, `.badge-*`) | Campos de entrada empotrados (`#080a11`) con foco verde menta; tablas con cabeceras oscuras (`#0a0c14`) y divisores sutiles; insignias tipo píldora en verde menta, ámbar cálido (`#f5c451`), coral (`#fb7185`) y cian eléctrico (`#56ccf2`). |
-| 4.6 | Firma del autor destacada (`.pie-autor`) | Pie de página con mayor jerarquía visual y tamaño (estilo `pdf_tooloffice`) en la pantalla de login, pie del sidebar y pie de la vista principal: título `Sistema Biométrico v3.0`, nombre del autor **`Bairon Calle Rivera`** en blanco y negrita destacada, y enlace `mailto:b41r0nn@gmail.com` en dorado cálido (`#fcd34d`) subrayado. |
+| 4.6 | Firma del autor destacada (`.pie-autor`) | Pie de página con mayor jerarquía visual y tamaño (estilo `pdf_tooloffice`) en la pantalla de login, pie del sidebar y pie de la vista principal: título `Sistema de Control de Asistencia Biométrica v3.0`, nombre del autor **`Bairon Calle Rivera`** en blanco y negrita destacada, y enlace `mailto:b41r0nn@gmail.com` en dorado cálido (`#fcd34d`) subrayado. |
 

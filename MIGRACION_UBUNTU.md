@@ -1,6 +1,6 @@
 # Guía de migración a Ubuntu Server — hikvision_asistencia
 
-Esta guía describe paso a paso cómo migrar el sistema de asistencia biométrica
+Esta guía describe paso a paso cómo migrar el sistema de control de asistencia biométrica
 desde el entorno de desarrollo en Windows hacia un servidor **Ubuntu Server**
 usando Docker y Docker Compose en producción.
 

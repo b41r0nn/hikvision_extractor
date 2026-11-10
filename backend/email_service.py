@@ -112,7 +112,7 @@ def enviar_reporte_semanal():
         cuerpo = (
             f"Adjunto encontrará el informe semanal de asistencia de REDIHOS S.A.S.\n\n"
             f"Período: {lunes_pasado.strftime('%d/%m/%Y')} al {viernes_pasado.strftime('%d/%m/%Y')}\n\n"
-            f"Este correo fue generado automáticamente por el Sistema de Asistencia Biométrica."
+            f"Este correo fue generado automáticamente por el Sistema de Control de Asistencia Biométrica."
         )
         _enviar_correo_raw(cfg, asunto, cuerpo, excel_bytes, nombre, recipients)
         print(f"[EMAIL] Correo semanal enviado exitosamente a: {', '.join(recipients)}")
@@ -144,7 +144,7 @@ def enviar_reporte_mensual():
         cuerpo = (
             f"Adjunto encontrará el informe mensual de asistencia de REDIHOS S.A.S.\n\n"
             f"Período: {primer_dia_mes_ant.strftime('%d/%m/%Y')} al {ultimo_dia_mes_ant.strftime('%d/%m/%Y')}\n\n"
-            f"Este correo fue generado automáticamente por el Sistema de Asistencia Biométrica."
+            f"Este correo fue generado automáticamente por el Sistema de Control de Asistencia Biométrica."
         )
         _enviar_correo_raw(cfg, asunto, cuerpo, excel_bytes, nombre, recipients)
         print(f"[EMAIL] Correo mensual enviado exitosamente a: {', '.join(recipients)}")
@@ -168,7 +168,7 @@ def enviar_correo_prueba_a(destinatario: str):
         cfg = _get_config_o_error(db)
         asunto = "Prueba de configuración — Sistema REDIHOS"
         cuerpo = (
-            "Este es un correo de prueba del Sistema de Asistencia Biométrica REDIHOS.\n"
+            "Este es un correo de prueba del Sistema de Control de Asistencia Biométrica REDIHOS.\n"
             "Si ves este mensaje, la configuración SMTP es correcta."
         )
         _enviar_correo_raw(cfg, asunto, cuerpo, b"", "prueba.txt", [destinatario])

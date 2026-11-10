@@ -1,7 +1,7 @@
 # Post-mortem: Fallo de login del usuario admin
 
 **Fecha:** 30 de julio de 2026
-**Sistema:** hikvision_extractor — Sistema de Asistencia Biométrica REDIHOS
+**Sistema:** hikvision_extractor — Sistema de Control de Asistencia Biométrica REDIHOS
 **Componente afectado:** Autenticación (`backend/auth.py`, tabla `usuarios` en PostgreSQL)
 **Severidad:** Alta — acceso bloqueado al panel de administración
 **Estado:** Resuelto

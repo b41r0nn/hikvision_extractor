@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Asistencia — REDIHOS</title>
-    <meta name="description" content="Panel de control del Sistema de Asistencia Biométrica REDIHOS S.A.S.">
+    <meta name="description" content="Panel de control del Sistema de Control de Asistencia Biométrica REDIHOS S.A.S.">
     <link rel="icon" href="favicon.ico" sizes="48x48">
     <link rel="icon" href="favicon.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
@@ -387,38 +387,40 @@
         .custom-scroll { scrollbar-width: thin; scrollbar-color: #2f3550 rgba(14, 16, 27, 0.65); }
 
         /* Pie de autor destacado (como en la segunda foto) */
+        /* Pie de autor: credito discreto — filete superior, sin tarjeta ni relleno.
+           El acento solo aparece al pasar el cursor sobre el correo. */
         .pie-autor {
-            margin-top: 36px;
-            padding: 26px 16px 28px;
-            background: #0a0d18;
-            border-top: 1px solid #26324d;
-            border-radius: 16px;
+            margin-top: 40px;
+            padding: 22px 16px 26px;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
             text-align: center;
-            font-size: 14px;
-            color: #8597B9;
-            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            font-size: 12.5px;
+            color: #7d87a3;
+            line-height: 1.65;
         }
-        .pie-autor p + p { margin-top: 5px; }
+        .pie-autor p + p { margin-top: 3px; }
         .pie-autor .pie-titulo {
             font-family: 'Plus Jakarta Sans', 'Inter', sans-serif;
-            font-size: 16px;
-            font-weight: 700;
-            color: #EEF3FB;
+            font-size: 13px;
+            font-weight: 600;
+            color: #c6cee0;
             letter-spacing: -0.01em;
         }
         .pie-autor strong {
-            color: #FFFFFF;
-            font-weight: 700;
-            font-size: 15px;
+            color: #eef1f8;
+            font-weight: 600;
         }
         .pie-autor a {
-            color: #FFE066;
-            font-weight: 600;
-            text-decoration: underline;
-            text-underline-offset: 3px;
+            color: #7d87a3;
+            font-weight: 500;
+            text-decoration: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.22);
+            padding-bottom: 1px;
+            transition: color .18s ease, border-color .18s ease;
         }
         .pie-autor a:hover {
-            color: #34e59e;
+            color: var(--accent);
+            border-color: rgba(52, 229, 158, 0.5);
         }
 
         @media (max-width:768px) {
@@ -433,7 +435,7 @@
     <div class="glass p-8 w-full max-w-sm space-y-6">
         <div class="text-center">
             <div class="flex justify-center mb-4">
-                <div class="p-3 rounded-2xl bg-[#131625] border border-white/10 shadow-inner">
+                <div class="p-3 rounded-2xl bg-[#eef1f8] border border-white/15 shadow-lg shadow-black/40">
                     <img src="logo.png" class="h-14 w-auto" alt="Logo REDIHOS">
                 </div>
             </div>
@@ -454,10 +456,9 @@
         </div>
     </div>
     <div class="mt-8 text-center">
-        <p class="text-sm font-bold text-[#EEF3FB]">Sistema Biométrico v3.0</p>
-        <p class="text-xs text-[#8597B9] mt-1">
-            Diseñado por <strong class="text-white font-bold text-sm">Bairon Calle Rivera</strong> — <a href="mailto:b41r0nn@gmail.com" class="text-[#FFE066] font-semibold underline underline-offset-4 hover:text-[#34e59e]">b41r0nn@gmail.com</a>
-        </p>
+        <p class="text-[13px] font-semibold text-[#c6cee0]">Sistema de Control de Asistencia Biométrica v3.0</p>
+        <p class="text-xs text-[#7d87a3] mt-1.5">Diseñado por <strong class="font-semibold text-[#eef1f8]">Bairon Calle Rivera</strong></p>
+        <p class="mt-1"><a href="mailto:b41r0nn@gmail.com" class="text-xs text-[#7d87a3] border-b border-white/20 pb-px transition-colors hover:text-[#34e59e] hover:border-[#34e59e]/50">b41r0nn@gmail.com</a></p>
     </div>
 </div>
 
@@ -490,7 +491,7 @@
 <!-- SIDEBAR -->
 <nav id="sidebar" class="flex flex-col p-4 pt-6 flex-shrink-0">
     <div class="mb-7 px-3 py-3 rounded-2xl bg-[#121524] border border-white/[0.07] shadow-inner">
-        <div class="mb-2.5">
+        <div class="mb-2.5 inline-block px-2.5 py-2 rounded-xl bg-[#eef1f8] border border-white/15 shadow-md shadow-black/40">
             <img src="logo.png" class="h-12 w-auto" alt="Logo REDIHOS">
         </div>
         <h1 class="text-base font-bold text-white leading-tight">Sistema de Asistencia</h1>
@@ -520,12 +521,10 @@
             <div class="text-xs font-medium text-slate-200 truncate" id="user-info">—</div>
         </div>
         <button onclick="logout()" class="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-rose-300 hover:bg-rose-500/10 transition-colors">Cerrar sesión</button>
-        <div class="pt-2 border-t border-white/[0.06] px-1 space-y-1">
-            <p class="text-xs font-bold text-[#EEF3FB]">Sistema Biométrico v3.0</p>
-            <p class="text-xs text-[#8597B9] leading-snug">
-                Diseñado por <strong class="text-white font-bold">Bairon Calle Rivera</strong><br>
-                <a href="mailto:b41r0nn@gmail.com" class="text-[#FFE066] font-semibold underline underline-offset-2 hover:text-[#34e59e]">b41r0nn@gmail.com</a>
-            </p>
+        <div class="pt-2.5 border-t border-white/[0.06] px-1 space-y-0.5">
+            <p class="text-[11px] font-semibold text-[#c6cee0]">Sistema de Control de Asistencia Biométrica v3.0</p>
+            <p class="text-[11px] text-[#7d87a3] leading-relaxed">Diseñado por <strong class="font-semibold text-[#dfe5f0]">Bairon Calle Rivera</strong></p>
+            <p><a href="mailto:b41r0nn@gmail.com" class="text-[11px] text-[#7d87a3] border-b border-white/20 pb-px transition-colors hover:text-[#34e59e] hover:border-[#34e59e]/50">b41r0nn@gmail.com</a></p>
         </div>
     </div>
 </nav>
@@ -1096,10 +1095,11 @@
 
     </div><!-- /admin -->
 
-    <!-- PIE DE AUTOR (como en la segunda foto) -->
+    <!-- PIE DE AUTOR -->
     <footer class="pie-autor">
-        <p class="pie-titulo">Sistema Biométrico v3.0</p>
-        <p>Diseñado por <strong>Bairon Calle Rivera</strong> — <a href="mailto:b41r0nn@gmail.com">b41r0nn@gmail.com</a></p>
+        <p class="pie-titulo">Sistema de Control de Asistencia Biométrica v3.0</p>
+        <p>Diseñado por <strong>Bairon Calle Rivera</strong></p>
+        <p><a href="mailto:b41r0nn@gmail.com">b41r0nn@gmail.com</a></p>
     </footer>
 
 </main>
